@@ -1,5 +1,5 @@
 """
-Real-Time Waveform Visualizer - Main Entry Point
+Waveform Generator/Analyzer - Main Entry Point
 
 This module initializes DearPyGui context and runs the main loop.
 """
@@ -15,7 +15,7 @@ def main():
 
     # Configure viewport
     dpg.create_viewport(
-        title="Real-Time Waveform Visualizer",
+        title="Waveform Generator/Analyzer",
         width=1200,
         height=800,
         min_width=1000,

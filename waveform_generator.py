@@ -110,29 +110,6 @@ def generate_triangle_wave(
     return time, wave
 
 
-def generate_pulse_wave(
-    frequency: float,
-    amplitude: float,
-    duty_cycle: float,
-    duration: float = 1.0,
-    sample_rate: int = 1000
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate a pulse wave (same as square wave).
-
-    Args:
-        frequency: Frequency in Hz (1.0-100.0)
-        amplitude: Amplitude (0.0-10.0)
-        duty_cycle: Duty cycle percentage (1.0-100.0)
-        duration: Duration in seconds
-        sample_rate: Samples per second
-
-    Returns:
-        Tuple of (time array, amplitude array)
-    """
-    return generate_square_wave(frequency, amplitude, duty_cycle, duration, sample_rate)
-
-
 def compute_max_envelope(
     waveforms: List[Tuple[np.ndarray, np.ndarray]]
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -189,10 +166,10 @@ def generate_waveform(
     Generate a waveform based on type.
 
     Args:
-        wave_type: Type of waveform (sine, square, pulse, sawtooth, triangle)
+        wave_type: Type of waveform (sine, square, sawtooth, triangle)
         frequency: Frequency in Hz (1.0-100.0)
         amplitude: Amplitude (0.0-10.0)
-        duty_cycle: Duty cycle percentage (1.0-100.0, for square/pulse only)
+        duty_cycle: Duty cycle percentage (1.0-100.0, for square only)
         duration: Duration in seconds
         sample_rate: Samples per second
 
@@ -205,8 +182,6 @@ def generate_waveform(
         return generate_sine_wave(frequency, amplitude, duration, sample_rate)
     elif wave_type == "square":
         return generate_square_wave(frequency, amplitude, duty_cycle, duration, sample_rate)
-    elif wave_type == "pulse":
-        return generate_pulse_wave(frequency, amplitude, duty_cycle, duration, sample_rate)
     elif wave_type == "sawtooth":
         return generate_sawtooth_wave(frequency, amplitude, duration, sample_rate)
     elif wave_type == "triangle":

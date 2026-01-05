@@ -1,10 +1,13 @@
 """
-Application state manager for the Real-Time Waveform Visualizer.
+Application state manager for the Waveform Generator/Analyzer.
 
 This module manages global and per-waveform state without UI or calculation logic.
 """
 
 from typing import Dict, List, Optional, Tuple
+
+# Default values
+DEFAULT_TIME_SPAN = 10.0  # seconds
 
 
 class WaveformState:
@@ -14,7 +17,7 @@ class WaveformState:
         self,
         waveform_id: int,
         wave_type: str = "sine",
-        frequency: float = 5.0,
+        frequency: float = 1.0,
         amplitude: float = 5.0,
         duty_cycle: float = 50.0,
         color: Tuple[int, int, int] = (255, 255, 0),
@@ -70,20 +73,20 @@ class AppState:
 
     def __init__(self):
         """Initialize application state with default values."""
-        self.time_span: float = 1.0  # 0.1-10.0 seconds
+        self.time_span: float = DEFAULT_TIME_SPAN  # 0.1-100.0 seconds
         self.sample_rate: int = 1000  # Fixed
         self.active_waveform_index: int = 0
         self.show_max_envelope: bool = False
         self.show_min_envelope: bool = False
-        self.auto_scale: bool = True
         self.show_grid: bool = True
+        self.hide_source_waveforms: bool = False
 
         # Initialize with one default sine waveform
         self.waveforms: List[WaveformState] = [
             WaveformState(
                 waveform_id=0,
                 wave_type="sine",
-                frequency=5.0,
+                frequency=1.0,
                 amplitude=5.0,
                 color=self.COLORS[0],
                 enabled=True
@@ -106,7 +109,7 @@ class AppState:
         new_waveform = WaveformState(
             waveform_id=waveform_id,
             wave_type="sine",
-            frequency=5.0,
+            frequency=1.0,
             amplitude=5.0,
             color=color,
             enabled=True
@@ -193,9 +196,9 @@ class AppState:
         Set time span with bounds checking.
 
         Args:
-            time_span: Time span in seconds (0.1-10.0)
+            time_span: Time span in seconds (0.1-100.0)
         """
-        self.time_span = max(0.1, min(10.0, time_span))
+        self.time_span = max(0.1, min(100.0, time_span))
 
 
 # Global singleton instance

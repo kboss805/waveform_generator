@@ -67,14 +67,14 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 
 ### US2: Adjust Parameters Dynamically
 **As an** engineer  
-**I want to** adjust frequency, amplitude, and pulse width of each waveform  
+**I want to** adjust frequency, amplitude, and duty cycle of each waveform  
 **So that** I can experiment and see immediate visual feedback
 
 **Acceptance Criteria:**
 - ✅ Frequency: 1-100 Hz, slider step 0.1 Hz
 - ✅ Amplitude: 0-10, slider step 0.1
-- ✅ Duty Cycle: 1-100%, slider step 1% (only for Square/Pulse waves)
-- ✅ Time Span: 0.1-10 seconds, slider step 0.1s
+- ✅ Duty Cycle: 1-100%, slider step 1% (only for Square waves)
+- ✅ Time Span: 0.1-100 seconds, slider step 0.1s
 - ✅ All plots update immediately on parameter change (<100ms latency)
 - ✅ Current values displayed clearly next to each slider
 
@@ -120,7 +120,6 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 |------|-------------------|-------------------|
 | Sine | frequency (1-100 Hz), amplitude (0-10) | - |
 | Square | frequency, amplitude | duty_cycle (1-100%, default 50%) |
-| Pulse | frequency, amplitude | duty_cycle (1-100%, default 50%) |
 | Sawtooth | frequency, amplitude | - |
 | Triangle | frequency, amplitude | - |
 
@@ -144,10 +143,10 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ```python
 {
     "id": int,              # 0-4
-    "wave_type": str,       # "sine" | "square" | "pulse" | "sawtooth" | "triangle"
+    "wave_type": str,       # "sine" | "square" | "sawtooth" | "triangle"
     "frequency": float,     # 1.0-100.0 Hz
     "amplitude": float,     # 0.0-10.0
-    "duty_cycle": float,    # 1.0-100.0% (Square/Pulse only)
+    "duty_cycle": float,    # 1.0-100.0% (Square only)
     "color": tuple,         # (R, G, B) auto-assigned
     "enabled": bool         # Show/hide waveform
 }
@@ -156,7 +155,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ### Global State
 ```python
 {
-    "time_span": float,              # 0.1-10.0 seconds
+    "time_span": float,              # 1-100.0 seconds
     "sample_rate": int,              # 1000 (fixed)
     "active_waveform_index": int,    # Which waveform controls are shown
     "show_max_envelope": bool,       # MaxEnvelope visibility
@@ -246,10 +245,6 @@ def generate_triangle_wave(frequency: float, amplitude: float, duration: float =
     time = np.linspace(0, duration, int(sample_rate * duration))
     return time, amplitude * signal.sawtooth(2 * np.pi * frequency * time, width=0.5)
 
-def generate_pulse_wave(frequency: float, amplitude: float, duty_cycle: float, duration: float = 1.0, sample_rate: int = 1000):
-    # Same as square wave
-    return generate_square_wave(frequency, amplitude, duty_cycle, duration, sample_rate)
-
 # Envelope calculations
 def compute_max_envelope(waveforms: list[tuple[np.ndarray, np.ndarray]]):
     if not waveforms: return np.array([]), np.array([])
@@ -324,7 +319,7 @@ Time (s),Waveform_1_Sine,Waveform_2_Square,Max_Envelope
 ### Pre-Commit Checklist
 - [ ] All 5 wave types render correctly
 - [ ] Edge cases: min/max frequency (1 Hz, 100 Hz), min/max amplitude (0, 10)
-- [ ] Duty cycle: 1%, 50%, 100% for Square/Pulse
+- [ ] Duty cycle: 1%, 50%, 100% for Square
 - [ ] Time span: 0.1s, 1s, 10s
 - [ ] Envelopes: Test with 2, 3, 5 waveforms (same phase, opposite phase)
 - [ ] Mixed enabled/disabled waveforms
@@ -335,7 +330,7 @@ Time (s),Waveform_1_Sine,Waveform_2_Square,Max_Envelope
 - [ ] FPS >30 during parameter changes
 
 ### Manual Test Scenarios
-1. **Startup:** Should show 1 Sine wave, 5 Hz, 5.0 amplitude
+1. **Startup:** Should show 1 Sine wave, 1 Hz, 5.0 amplitude
 2. **Add to max:** Add 4 more waveforms, verify limit enforcement
 3. **Remove to min:** Remove to 1 waveform, verify limit enforcement
 4. **Envelope edge:** Enable max/min with only 1 wave (should be disabled)
@@ -368,6 +363,7 @@ Time (s),Waveform_1_Sine,Waveform_2_Square,Max_Envelope
 - [ ] **Trigger Mode:** Oscilloscope-style triggering
 - [ ] **Multiple Plots:** Separate plots option
 - [ ] **Detachable Windows:** Resizable, multi-monitor support
+- [ ] **Custom User Settings:** Allow user to define default waveform parameters, display values, etc. from a configuration file 
 
 ---
 
