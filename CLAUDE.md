@@ -62,7 +62,6 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 **Acceptance Criteria:**
 - ✅ Display all plots updating in real-time
 - ✅ Smooth updates (>30 FPS)
-- ✅ Independent zoom/pan for each plot
 - ✅ All plots update within 100ms of parameter change
 
 ### US2: Adjust Parameters Dynamically
@@ -201,7 +200,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 
 **Main Area:** Single plot, all waveforms overlaid, shared time axis
 
-**Status Bar:** `Sample Rate: 1000 S/s | FPS: XX | Waveforms: X/5`
+**Status Bar:** `Waveforms: X/5`
 
 ### Color Palette (Auto-assigned)
 | Waveform | Color | RGB |

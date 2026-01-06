@@ -6,7 +6,13 @@ This module contains all DearPyGui UI creation and callback logic.
 
 import dearpygui.dearpygui as dpg
 from typing import Optional
-from app_state import app_state, WaveformState, DEFAULT_TIME_SPAN
+from app_state import (
+    app_state, DEFAULT_TIME_SPAN,
+    TIME_SPAN_MIN, TIME_SPAN_MAX, TIME_SPAN_STEP,
+    FREQUENCY_MIN, FREQUENCY_MAX, FREQUENCY_STEP,
+    AMPLITUDE_MIN, AMPLITUDE_MAX, AMPLITUDE_STEP,
+    DUTY_CYCLE_MIN, DUTY_CYCLE_MAX, DUTY_CYCLE_STEP
+)
 from waveform_generator import generate_waveform, compute_max_envelope, compute_min_envelope
 from data_export import export_to_csv, prepare_waveform_for_export
 
@@ -79,6 +85,9 @@ DEFAULT_Y_MAX = 12
 ENABLED_LABEL_COLOR = (255, 255, 255, 255)  # White
 DISABLED_LABEL_COLOR = (128, 128, 128, 255)  # Light gray
 
+# Theme cache for line series (color -> theme)
+_line_theme_cache = {}
+
 
 def update_all_plots() -> None:
     """Regenerate and update all waveform plots and envelopes."""
@@ -109,8 +118,7 @@ def update_all_plots() -> None:
                 series_tag = f"wave_{waveform.id}_series"
                 label = f"Waveform {waveform.id + 1}"
 
-                # Convert color to normalized values (0-1)
-                color_normalized = tuple(c / 255.0 for c in waveform.color) + (1.0,)
+                # Convert color to RGBA int tuple (0-255)
                 color_int = tuple(int(c) for c in waveform.color) + (255,)
 
                 dpg.add_line_series(
@@ -158,7 +166,7 @@ def update_all_plots() -> None:
 
 def create_line_theme(color: tuple, thickness: float = 2.0) -> str:
     """
-    Create a theme for line series.
+    Create or retrieve a cached theme for line series.
 
     Args:
         color: RGBA color tuple (0-255)
@@ -167,10 +175,20 @@ def create_line_theme(color: tuple, thickness: float = 2.0) -> str:
     Returns:
         Theme tag
     """
+    # Create cache key from color and thickness
+    cache_key = (color, thickness)
+
+    # Return cached theme if available
+    if cache_key in _line_theme_cache:
+        return _line_theme_cache[cache_key]
+
+    # Create new theme and cache it
     with dpg.theme() as theme:
         with dpg.theme_component(dpg.mvLineSeries):
             dpg.add_theme_color(dpg.mvPlotCol_Line, color, category=dpg.mvThemeCat_Plots)
             dpg.add_theme_style(dpg.mvPlotStyleVar_LineWeight, thickness, category=dpg.mvThemeCat_Plots)
+
+    _line_theme_cache[cache_key] = theme
     return theme
 
 
@@ -246,7 +264,7 @@ def on_time_span_changed(sender, value):
 
 def on_time_span_increment():
     """Increment time span by step amount."""
-    new_value = min(120.0, app_state.time_span + 0.5)
+    new_value = min(TIME_SPAN_MAX, app_state.time_span + TIME_SPAN_STEP)
     app_state.set_time_span(new_value)
     dpg.set_value(TIME_SPAN_INPUT, new_value)
     update_time_span_buttons()
@@ -255,7 +273,7 @@ def on_time_span_increment():
 
 def on_time_span_decrement():
     """Decrement time span by step amount."""
-    new_value = max(0.5, app_state.time_span - 0.5)
+    new_value = max(TIME_SPAN_MIN, app_state.time_span - TIME_SPAN_STEP)
     app_state.set_time_span(new_value)
     dpg.set_value(TIME_SPAN_INPUT, new_value)
     update_time_span_buttons()
@@ -264,7 +282,7 @@ def on_time_span_decrement():
 
 def on_time_span_input_changed(sender, value):
     """Callback for time span text input."""
-    app_state.set_time_span(max(0.5, min(120.0, value)))
+    app_state.set_time_span(max(TIME_SPAN_MIN, min(TIME_SPAN_MAX, value)))
     dpg.set_value(TIME_SPAN_INPUT, app_state.time_span)
     update_time_span_buttons()
     update_all_plots()
@@ -274,7 +292,7 @@ def on_frequency_changed(sender, value):
     """Callback for frequency slider."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        waveform.frequency = max(1.0, min(100.0, value))
+        waveform.frequency = max(FREQUENCY_MIN, min(FREQUENCY_MAX, value))
         update_all_plots()
         update_waveform_list()
 
@@ -283,7 +301,7 @@ def on_amplitude_changed(sender, value):
     """Callback for amplitude slider."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        waveform.amplitude = max(0.0, min(10.0, value))
+        waveform.amplitude = max(AMPLITUDE_MIN, min(AMPLITUDE_MAX, value))
         update_all_plots()
 
 
@@ -291,7 +309,7 @@ def on_duty_cycle_changed(sender, value):
     """Callback for duty cycle slider."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        waveform.duty_cycle = max(1.0, min(100.0, value))
+        waveform.duty_cycle = max(DUTY_CYCLE_MIN, min(DUTY_CYCLE_MAX, value))
         update_all_plots()
 
 
@@ -299,7 +317,7 @@ def on_frequency_increment():
     """Increment frequency by step amount."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        new_value = min(100.0, waveform.frequency + 0.1)
+        new_value = min(FREQUENCY_MAX, waveform.frequency + FREQUENCY_STEP)
         waveform.frequency = new_value
         dpg.set_value(FREQ_INPUT, new_value)
         update_waveform_parameters()
@@ -311,7 +329,7 @@ def on_frequency_decrement():
     """Decrement frequency by step amount."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        new_value = max(1.0, waveform.frequency - 0.1)
+        new_value = max(FREQUENCY_MIN, waveform.frequency - FREQUENCY_STEP)
         waveform.frequency = new_value
         dpg.set_value(FREQ_INPUT, new_value)
         update_waveform_parameters()
@@ -323,7 +341,7 @@ def on_frequency_input_changed(sender, value):
     """Callback for frequency text input."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        waveform.frequency = max(1.0, min(100.0, value))
+        waveform.frequency = max(FREQUENCY_MIN, min(FREQUENCY_MAX, value))
         dpg.set_value(FREQ_INPUT, waveform.frequency)
         update_waveform_parameters()
         update_all_plots()
@@ -334,7 +352,7 @@ def on_amplitude_increment():
     """Increment amplitude by step amount."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        new_value = min(10.0, waveform.amplitude + 0.1)
+        new_value = min(AMPLITUDE_MAX, waveform.amplitude + AMPLITUDE_STEP)
         waveform.amplitude = new_value
         dpg.set_value(AMP_INPUT, new_value)
         update_waveform_parameters()
@@ -345,7 +363,7 @@ def on_amplitude_decrement():
     """Decrement amplitude by step amount."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        new_value = max(0.0, waveform.amplitude - 0.1)
+        new_value = max(AMPLITUDE_MIN, waveform.amplitude - AMPLITUDE_STEP)
         waveform.amplitude = new_value
         dpg.set_value(AMP_INPUT, new_value)
         update_waveform_parameters()
@@ -356,7 +374,7 @@ def on_amplitude_input_changed(sender, value):
     """Callback for amplitude text input."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        waveform.amplitude = max(0.0, min(10.0, value))
+        waveform.amplitude = max(AMPLITUDE_MIN, min(AMPLITUDE_MAX, value))
         dpg.set_value(AMP_INPUT, waveform.amplitude)
         update_waveform_parameters()
         update_all_plots()
@@ -366,7 +384,7 @@ def on_duty_cycle_increment():
     """Increment duty cycle by step amount."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        new_value = min(100.0, waveform.duty_cycle + 1.0)
+        new_value = min(DUTY_CYCLE_MAX, waveform.duty_cycle + DUTY_CYCLE_STEP)
         waveform.duty_cycle = new_value
         dpg.set_value(DUTY_INPUT, new_value)
         update_waveform_parameters()
@@ -377,7 +395,7 @@ def on_duty_cycle_decrement():
     """Decrement duty cycle by step amount."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        new_value = max(1.0, waveform.duty_cycle - 1.0)
+        new_value = max(DUTY_CYCLE_MIN, waveform.duty_cycle - DUTY_CYCLE_STEP)
         waveform.duty_cycle = new_value
         dpg.set_value(DUTY_INPUT, new_value)
         update_waveform_parameters()
@@ -388,7 +406,7 @@ def on_duty_cycle_input_changed(sender, value):
     """Callback for duty cycle text input."""
     waveform = app_state.get_active_waveform()
     if waveform:
-        waveform.duty_cycle = max(1.0, min(100.0, value))
+        waveform.duty_cycle = max(DUTY_CYCLE_MIN, min(DUTY_CYCLE_MAX, value))
         dpg.set_value(DUTY_INPUT, waveform.duty_cycle)
         update_waveform_parameters()
         update_all_plots()
@@ -613,8 +631,9 @@ def on_file_dialog_ok(sender, app_data, user_data):
     print(f"FINAL PATH TO USE: {repr(filename)}")
     print("=========================\n")
 
-    # Collect enabled waveform data
+    # Collect enabled waveform data (generate once, reuse for envelopes)
     waveforms_to_export = []
+    waveform_arrays = []  # Store (time, amplitude) for envelope calculation
     for waveform in app_state.get_enabled_waveforms():
         time, amplitude = generate_waveform(
             waveform.wave_type,
@@ -624,38 +643,27 @@ def on_file_dialog_ok(sender, app_data, user_data):
             app_state.time_span,
             app_state.sample_rate
         )
+        waveform_arrays.append((time, amplitude))
 
         name = f"Waveform_{waveform.id + 1}_{waveform.wave_type.capitalize()}"
-        waveform_data = prepare_waveform_for_export(
+        export_data = prepare_waveform_for_export(
             name, time, amplitude,
             waveform.wave_type,
             waveform.frequency,
             waveform.amplitude,
             waveform.duty_cycle
         )
-        waveforms_to_export.append(waveform_data)
+        waveforms_to_export.append(export_data)
 
-    # Collect envelope data if enabled
+    # Collect envelope data if enabled (reuse already-generated waveform data)
     envelopes_to_export = []
-    if app_state.can_show_envelopes():
-        waveform_data = []
-        for waveform in app_state.get_enabled_waveforms():
-            time, amplitude = generate_waveform(
-                waveform.wave_type,
-                waveform.frequency,
-                waveform.amplitude,
-                waveform.duty_cycle,
-                app_state.time_span,
-                app_state.sample_rate
-            )
-            waveform_data.append((time, amplitude))
-
+    if app_state.can_show_envelopes() and waveform_arrays:
         if app_state.show_max_envelope:
-            time, max_env = compute_max_envelope(waveform_data)
+            time, max_env = compute_max_envelope(waveform_arrays)
             envelopes_to_export.append(("Max_Envelope", time, max_env))
 
         if app_state.show_min_envelope:
-            time, min_env = compute_min_envelope(waveform_data)
+            time, min_env = compute_min_envelope(waveform_arrays)
             envelopes_to_export.append(("Min_Envelope", time, min_env))
 
     # Export
@@ -735,8 +743,8 @@ def update_time_span_buttons():
     """Update time span button states based on current value."""
     global disabled_button_theme
 
-    time_at_min = app_state.time_span <= 0.5
-    time_at_max = app_state.time_span >= 120.0
+    time_at_min = app_state.time_span <= TIME_SPAN_MIN
+    time_at_max = app_state.time_span >= TIME_SPAN_MAX
     dpg.configure_item(TIME_SPAN_DEC_BTN, enabled=not time_at_min)
     dpg.configure_item(TIME_SPAN_INC_BTN, enabled=not time_at_max)
     dpg.bind_item_theme(TIME_SPAN_DEC_BTN, disabled_button_theme if time_at_min else 0)
@@ -758,24 +766,24 @@ def update_waveform_parameters():
     dpg.set_value(WAVE_TYPE_COMBO, waveform.wave_type.capitalize())
 
     # Update frequency button states
-    freq_at_min = waveform.frequency <= 1.0
-    freq_at_max = waveform.frequency >= 100.0
+    freq_at_min = waveform.frequency <= FREQUENCY_MIN
+    freq_at_max = waveform.frequency >= FREQUENCY_MAX
     dpg.configure_item(FREQ_DEC_BTN, enabled=not freq_at_min)
     dpg.configure_item(FREQ_INC_BTN, enabled=not freq_at_max)
     dpg.bind_item_theme(FREQ_DEC_BTN, disabled_button_theme if freq_at_min else 0)
     dpg.bind_item_theme(FREQ_INC_BTN, disabled_button_theme if freq_at_max else 0)
 
     # Update amplitude button states
-    amp_at_min = waveform.amplitude <= 0.0
-    amp_at_max = waveform.amplitude >= 10.0
+    amp_at_min = waveform.amplitude <= AMPLITUDE_MIN
+    amp_at_max = waveform.amplitude >= AMPLITUDE_MAX
     dpg.configure_item(AMP_DEC_BTN, enabled=not amp_at_min)
     dpg.configure_item(AMP_INC_BTN, enabled=not amp_at_max)
     dpg.bind_item_theme(AMP_DEC_BTN, disabled_button_theme if amp_at_min else 0)
     dpg.bind_item_theme(AMP_INC_BTN, disabled_button_theme if amp_at_max else 0)
 
     # Update duty cycle button states
-    duty_at_min = waveform.duty_cycle <= 1.0
-    duty_at_max = waveform.duty_cycle >= 100.0
+    duty_at_min = waveform.duty_cycle <= DUTY_CYCLE_MIN
+    duty_at_max = waveform.duty_cycle >= DUTY_CYCLE_MAX
     dpg.configure_item(DUTY_DEC_BTN, enabled=not duty_at_min)
     dpg.configure_item(DUTY_INC_BTN, enabled=not duty_at_max)
     dpg.bind_item_theme(DUTY_DEC_BTN, disabled_button_theme if duty_at_min else 0)
@@ -856,8 +864,7 @@ def update_add_button():
 def update_status_bar():
     """Update status bar with current info."""
     num_waveforms = len(app_state.waveforms)
-    fps = dpg.get_frame_rate()
-    status_text = f"Sample Rate: {app_state.sample_rate} S/s | FPS: {fps:.0f} | Waveforms: {num_waveforms}/{app_state.MAX_WAVEFORMS}"
+    status_text = f"Waveforms: {num_waveforms}/{app_state.MAX_WAVEFORMS}"
     dpg.set_value(STATUS_BAR, status_text)
 
 
@@ -891,8 +898,8 @@ def create_ui():
                     dpg.add_input_float(
                         tag=TIME_SPAN_INPUT,
                         default_value=DEFAULT_TIME_SPAN,
-                        min_value=0.5,
-                        max_value=120.0,
+                        min_value=TIME_SPAN_MIN,
+                        max_value=TIME_SPAN_MAX,
                         min_clamped=True,
                         max_clamped=True,
                         callback=on_time_span_input_changed,
@@ -998,9 +1005,9 @@ def create_ui():
                 with dpg.group(horizontal=True, tag=FREQ_GROUP):
                     dpg.add_input_float(
                         tag=FREQ_INPUT,
-                        default_value=1.0,
-                        min_value=1.0,
-                        max_value=100.0,
+                        default_value=FREQUENCY_MIN,
+                        min_value=FREQUENCY_MIN,
+                        max_value=FREQUENCY_MAX,
                         min_clamped=True,
                         max_clamped=True,
                         callback=on_frequency_input_changed,
@@ -1028,8 +1035,8 @@ def create_ui():
                     dpg.add_input_float(
                         tag=AMP_INPUT,
                         default_value=5.0,
-                        min_value=0.0,
-                        max_value=10.0,
+                        min_value=AMPLITUDE_MIN,
+                        max_value=AMPLITUDE_MAX,
                         min_clamped=True,
                         max_clamped=True,
                         callback=on_amplitude_input_changed,
@@ -1057,8 +1064,8 @@ def create_ui():
                     dpg.add_input_float(
                         tag=DUTY_INPUT,
                         default_value=50.0,
-                        min_value=1.0,
-                        max_value=100.0,
+                        min_value=DUTY_CYCLE_MIN,
+                        max_value=DUTY_CYCLE_MAX,
                         min_clamped=True,
                         max_clamped=True,
                         callback=on_duty_cycle_input_changed,

@@ -9,6 +9,23 @@ from typing import Dict, List, Optional, Tuple
 # Default values
 DEFAULT_TIME_SPAN = 10.0  # seconds
 
+# Parameter bounds
+TIME_SPAN_MIN = 0.5
+TIME_SPAN_MAX = 120.0
+TIME_SPAN_STEP = 0.5
+
+FREQUENCY_MIN = 1.0
+FREQUENCY_MAX = 100.0
+FREQUENCY_STEP = 0.1
+
+AMPLITUDE_MIN = 0.0
+AMPLITUDE_MAX = 10.0
+AMPLITUDE_STEP = 0.1
+
+DUTY_CYCLE_MIN = 1.0
+DUTY_CYCLE_MAX = 100.0
+DUTY_CYCLE_STEP = 1.0
+
 
 class WaveformState:
     """Manages state for a single waveform."""
@@ -37,9 +54,9 @@ class WaveformState:
         """
         self.id = waveform_id
         self.wave_type = wave_type
-        self.frequency = max(1.0, min(100.0, frequency))
-        self.amplitude = max(0.0, min(10.0, amplitude))
-        self.duty_cycle = max(1.0, min(100.0, duty_cycle))
+        self.frequency = max(FREQUENCY_MIN, min(FREQUENCY_MAX, frequency))
+        self.amplitude = max(AMPLITUDE_MIN, min(AMPLITUDE_MAX, amplitude))
+        self.duty_cycle = max(DUTY_CYCLE_MIN, min(DUTY_CYCLE_MAX, duty_cycle))
         self.color = color
         self.enabled = enabled
 
@@ -198,7 +215,7 @@ class AppState:
         Args:
             time_span: Time span in seconds (0.5-120.0)
         """
-        self.time_span = max(0.5, min(120.0, time_span))
+        self.time_span = max(TIME_SPAN_MIN, min(TIME_SPAN_MAX, time_span))
 
 
 # Global singleton instance
