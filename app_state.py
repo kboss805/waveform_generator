@@ -4,38 +4,43 @@ Application state manager for the Waveform Generator/Analyzer.
 This module manages global and per-waveform state without UI or calculation logic.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 # Default values
-DEFAULT_TIME_SPAN = 10.0  # seconds
+DEFAULT_DURATION = 10.0  # seconds
 
 # Parameter bounds
-TIME_SPAN_MIN = 0.5
-TIME_SPAN_MAX = 120.0
-TIME_SPAN_STEP = 0.5
+DURATION_MIN = 0.5
+DURATION_MAX = 120.0
+DURATION_STEP = 0.5
 
-FREQUENCY_MIN = 1.0
-FREQUENCY_MAX = 100.0
-FREQUENCY_STEP = 0.1
+FREQ_MIN = 0.1
+FREQ_MAX = 100.0
+FREQ_STEP = 0.1
 
-AMPLITUDE_MIN = 0.0
-AMPLITUDE_MAX = 10.0
-AMPLITUDE_STEP = 0.1
+AMP_MIN = 0.0
+AMP_MAX = 10.0
+AMP_STEP = 0.1
 
-DUTY_CYCLE_MIN = 1.0
-DUTY_CYCLE_MAX = 100.0
-DUTY_CYCLE_STEP = 1.0
+DUTY_MIN = 1.0
+DUTY_MAX = 100.0
+DUTY_STEP = 1.0
+
+OFFSET_MIN = 0.0
+OFFSET_MAX = 10.0
+OFFSET_STEP = 0.1
 
 
-class WaveformState:
+class WfState:
     """Manages state for a single waveform."""
 
     def __init__(
         self,
-        waveform_id: int,
-        wave_type: str = "sine",
-        frequency: float = 1.0,
-        amplitude: float = 5.0,
+        wf_id: int,
+        wf_type: str = "sine",
+        freq: float = 1.0,
+        amp: float = 5.0,
+        offset: float = 5.0,
         duty_cycle: float = 50.0,
         color: Tuple[int, int, int] = (255, 255, 0),
         enabled: bool = True
@@ -44,33 +49,23 @@ class WaveformState:
         Initialize waveform state.
 
         Args:
-            waveform_id: Unique identifier (0-4)
-            wave_type: Type of waveform (sine, square, pulse, sawtooth, triangle)
-            frequency: Frequency in Hz (1.0-100.0)
-            amplitude: Amplitude (0.0-10.0)
-            duty_cycle: Duty cycle percentage (1.0-100.0, for Square/Pulse only)
+            wf_id: Unique identifier (0-4)
+            wf_type: Type of waveform (sine, square, sawtooth, triangle)
+            freq: Frequency in Hz (0.1-100.0)
+            amp: Amplitude (0.0-10.0)
+            offset: Y-axis offset (0.0-10.0)
+            duty_cycle: Duty cycle percentage (1.0-100.0, for Square only)
             color: RGB color tuple
             enabled: Whether waveform is visible
         """
-        self.id = waveform_id
-        self.wave_type = wave_type
-        self.frequency = max(FREQUENCY_MIN, min(FREQUENCY_MAX, frequency))
-        self.amplitude = max(AMPLITUDE_MIN, min(AMPLITUDE_MAX, amplitude))
-        self.duty_cycle = max(DUTY_CYCLE_MIN, min(DUTY_CYCLE_MAX, duty_cycle))
+        self.id = wf_id
+        self.wf_type = wf_type
+        self.freq = max(FREQ_MIN, min(FREQ_MAX, freq))
+        self.amp = max(AMP_MIN, min(AMP_MAX, amp))
+        self.offset = max(OFFSET_MIN, min(OFFSET_MAX, offset))
+        self.duty_cycle = max(DUTY_MIN, min(DUTY_MAX, duty_cycle))
         self.color = color
         self.enabled = enabled
-
-    def to_dict(self) -> Dict:
-        """Convert waveform state to dictionary."""
-        return {
-            "id": self.id,
-            "wave_type": self.wave_type,
-            "frequency": self.frequency,
-            "amplitude": self.amplitude,
-            "duty_cycle": self.duty_cycle,
-            "color": self.color,
-            "enabled": self.enabled
-        }
 
 
 class AppState:
@@ -85,119 +80,118 @@ class AppState:
         (255, 165, 0)     # Orange
     ]
 
-    MAX_WAVEFORMS = 5
-    MIN_WAVEFORMS = 1
+    MAX_WFS = 5
+    MIN_WFS = 1
 
     def __init__(self):
         """Initialize application state with default values."""
-        self.time_span: float = DEFAULT_TIME_SPAN  # 0.1-100.0 seconds
+        self.duration: float = DEFAULT_DURATION  # 0.5-120.0 seconds
         self.sample_rate: int = 1000  # Fixed
-        self.active_waveform_index: int = 0
-        self.show_max_envelope: bool = False
-        self.show_min_envelope: bool = False
-        self.show_grid: bool = True
-        self.hide_source_waveforms: bool = False
+        self.active_wf_index: int = 0
+        self.show_max_env: bool = False
+        self.show_min_env: bool = False
+        self.hide_src_wfs: bool = False
 
         # Initialize with one default sine waveform
-        self.waveforms: List[WaveformState] = [
-            WaveformState(
-                waveform_id=0,
-                wave_type="sine",
-                frequency=1.0,
-                amplitude=5.0,
+        self.wfs: List[WfState] = [
+            WfState(
+                wf_id=0,
+                wf_type="sine",
+                freq=1.0,
+                amp=5.0,
                 color=self.COLORS[0],
                 enabled=True
             )
         ]
 
-    def add_waveform(self) -> Optional[WaveformState]:
+    def add_wf(self) -> Optional[WfState]:
         """
         Add a new waveform if under max limit.
 
         Returns:
-            The newly created WaveformState, or None if at max limit
+            The newly created WfState, or None if at max limit
         """
-        if len(self.waveforms) >= self.MAX_WAVEFORMS:
+        if len(self.wfs) >= self.MAX_WFS:
             return None
 
-        waveform_id = len(self.waveforms)
-        color = self.COLORS[waveform_id % len(self.COLORS)]
+        wf_id = len(self.wfs)
+        color = self.COLORS[wf_id % len(self.COLORS)]
 
-        new_waveform = WaveformState(
-            waveform_id=waveform_id,
-            wave_type="sine",
-            frequency=1.0,
-            amplitude=5.0,
+        new_wf = WfState(
+            wf_id=wf_id,
+            wf_type="sine",
+            freq=1.0,
+            amp=5.0,
             color=color,
             enabled=True
         )
 
-        self.waveforms.append(new_waveform)
-        self.active_waveform_index = waveform_id
+        self.wfs.append(new_wf)
+        self.active_wf_index = wf_id
 
-        return new_waveform
+        return new_wf
 
-    def remove_waveform(self, waveform_id: int) -> bool:
+    def remove_wf(self, wf_id: int) -> bool:
         """
         Remove a waveform if above min limit.
 
         Args:
-            waveform_id: ID of waveform to remove
+            wf_id: ID of waveform to remove
 
         Returns:
             True if removed, False if at min limit or not found
         """
-        if len(self.waveforms) <= self.MIN_WAVEFORMS:
+        if len(self.wfs) <= self.MIN_WFS:
             return False
 
         # Find and remove waveform
-        self.waveforms = [w for w in self.waveforms if w.id != waveform_id]
+        self.wfs = [w for w in self.wfs if w.id != wf_id]
 
         # Reassign IDs and colors
-        for idx, waveform in enumerate(self.waveforms):
-            waveform.id = idx
-            waveform.color = self.COLORS[idx % len(self.COLORS)]
+        for idx, wf in enumerate(self.wfs):
+            wf.id = idx
+            wf.color = self.COLORS[idx % len(self.COLORS)]
 
         # Update active index if needed
-        if self.active_waveform_index >= len(self.waveforms):
-            self.active_waveform_index = len(self.waveforms) - 1
+        if self.active_wf_index >= len(self.wfs):
+            self.active_wf_index = len(self.wfs) - 1
 
         return True
 
-    def get_waveform(self, waveform_id: int) -> Optional[WaveformState]:
+    def get_wf(self, wf_id: int) -> Optional[WfState]:
         """
         Get waveform by ID.
 
         Args:
-            waveform_id: ID of waveform to retrieve
+            wf_id: ID of waveform to retrieve
 
         Returns:
-            WaveformState or None if not found
+            WfState or None if not found
         """
-        for waveform in self.waveforms:
-            if waveform.id == waveform_id:
-                return waveform
+        for wf in self.wfs:
+            if wf.id == wf_id:
+                return wf
         return None
 
-    def get_active_waveform(self) -> Optional[WaveformState]:
+    def get_active_wf(self) -> Optional[WfState]:
         """
         Get currently active waveform.
 
         Returns:
-            Active WaveformState or None
+            Active WfState or None
         """
-        if 0 <= self.active_waveform_index < len(self.waveforms):
-            return self.waveforms[self.active_waveform_index]
+        if 0 <= self.active_wf_index < len(self.wfs):
+            return self.wfs[self.active_wf_index]
         return None
 
-    def get_enabled_waveforms(self) -> List[WaveformState]:
+    def get_enabled_wfs(self) -> List[WfState]:
         """
         Get list of enabled waveforms.
 
         Returns:
-            List of enabled WaveformState objects
+            List of enabled WfState objects
         """
-        return [w for w in self.waveforms if w.enabled]
+        return [w for w in self.wfs if w.enabled]
 
     def can_show_envelopes(self) -> bool:
         """
@@ -206,16 +200,16 @@ class AppState:
         Returns:
             True if envelopes can be displayed
         """
-        return len(self.get_enabled_waveforms()) > 1
+        return len(self.get_enabled_wfs()) > 1
 
-    def set_time_span(self, time_span: float) -> None:
+    def set_duration(self, duration: float) -> None:
         """
-        Set time span with bounds checking.
+        Set duration with bounds checking.
 
         Args:
-            time_span: Time span in seconds (0.5-120.0)
+            duration: Duration in seconds (0.5-120.0)
         """
-        self.time_span = max(TIME_SPAN_MIN, min(TIME_SPAN_MAX, time_span))
+        self.duration = max(DURATION_MIN, min(DURATION_MAX, duration))
 
 
 # Global singleton instance

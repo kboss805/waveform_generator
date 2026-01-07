@@ -7,18 +7,19 @@ This module contains all CustomTkinter UI creation and callback logic.
 import customtkinter as ctk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
 from app_state import (
-    app_state, DEFAULT_TIME_SPAN,
-    TIME_SPAN_MIN, TIME_SPAN_MAX, TIME_SPAN_STEP,
-    FREQUENCY_MIN, FREQUENCY_MAX, FREQUENCY_STEP,
-    AMPLITUDE_MIN, AMPLITUDE_MAX, AMPLITUDE_STEP,
-    DUTY_CYCLE_MIN, DUTY_CYCLE_MAX, DUTY_CYCLE_STEP
+    app_state, DEFAULT_DURATION,
+    DURATION_MIN, DURATION_MAX, DURATION_STEP,
+    FREQ_MIN, FREQ_MAX, FREQ_STEP,
+    AMP_MIN, AMP_MAX, AMP_STEP,
+    OFFSET_MIN, OFFSET_MAX, OFFSET_STEP,
+    DUTY_MIN, DUTY_MAX, DUTY_STEP
 )
-from waveform_generator import generate_waveform, compute_max_envelope, compute_min_envelope
-from data_export import export_to_csv, prepare_waveform_for_export
+from waveform_generator import gen_wf, compute_max_env, compute_min_env
+from data_export import export_to_csv, prep_wf_for_export
 
 
 # Configure CustomTkinter appearance
@@ -40,14 +41,14 @@ class WaveformApp(ctk.CTk):
         # Window configuration
         self.title("Waveform Generator/Analyzer")
         self.geometry("1200x900")
-        self.minsize(1000, 700)
+        self.minsize(1000, 800)
 
         # Configure grid weights
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         # Store widget references
-        self.waveform_buttons = []
+        self.wf_buttons = []
         self.toggle_buttons = []
         self.remove_buttons = []
 
@@ -57,9 +58,9 @@ class WaveformApp(ctk.CTk):
         self._create_status_bar()
 
         # Initialize UI state
-        self._update_waveform_list()
-        self._update_waveform_parameters()
-        self._update_envelope_controls()
+        self._update_wf_list()
+        self._update_wf_parameters()
+        self._update_env_controls()
         self._update_add_button()
         self._update_all_plots()
 
@@ -69,163 +70,123 @@ class WaveformApp(ctk.CTk):
         self.sidebar = ctk.CTkScrollableFrame(self, width=330)
         self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=(10, 0))
 
-        # === Display Controls ===
-        self._add_section_header("Display Controls")
-
-        # Time Span
-        ctk.CTkLabel(self.sidebar, text="Time Span (s)").pack(anchor="w", pady=(5, 2))
-        time_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        time_frame.pack(fill="x", pady=(0, 5))
-
-        self.time_span_entry = ctk.CTkEntry(time_frame, width=120)
-        self.time_span_entry.pack(side="left", padx=(0, 5))
-        self.time_span_entry.insert(0, str(DEFAULT_TIME_SPAN))
-        self.time_span_entry.bind("<Return>", self._on_time_span_enter)
-        self.time_span_entry.bind("<FocusOut>", self._on_time_span_enter)
-
-        self.time_dec_btn = ctk.CTkButton(
-            time_frame, text="-", width=30,
-            command=self._on_time_span_decrement
-        )
-        self.time_dec_btn.pack(side="left", padx=2)
-
-        self.time_inc_btn = ctk.CTkButton(
-            time_frame, text="+", width=30,
-            command=self._on_time_span_increment
-        )
-        self.time_inc_btn.pack(side="left", padx=2)
-
-        # Show Grid checkbox
-        self.show_grid_var = ctk.BooleanVar(value=True)
-        self.show_grid_cb = ctk.CTkCheckBox(
-            self.sidebar, text="Show Grid",
-            variable=self.show_grid_var,
-            command=self._on_show_grid_changed
-        )
-        self.show_grid_cb.pack(anchor="w", pady=2)
-
-        # Reset View button
-        ctk.CTkButton(
-            self.sidebar, text="Reset View",
-            command=self._on_reset_view
-        ).pack(fill="x", pady=(5, 10))
-
-        # === Advanced ===
-        self._add_section_header("Advanced")
-
-        # Max Envelope checkbox
-        env_frame1 = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        env_frame1.pack(fill="x", pady=2)
-        self.max_env_var = ctk.BooleanVar(value=False)
-        self.max_env_cb = ctk.CTkCheckBox(
-            env_frame1, text="",
-            variable=self.max_env_var,
-            command=self._on_max_envelope_changed,
-            width=24
-        )
-        self.max_env_cb.pack(side="left")
-        self.max_env_label = ctk.CTkLabel(env_frame1, text="Show Max Envelope")
-        self.max_env_label.pack(side="left")
-
-        # Min Envelope checkbox
-        env_frame2 = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        env_frame2.pack(fill="x", pady=2)
-        self.min_env_var = ctk.BooleanVar(value=False)
-        self.min_env_cb = ctk.CTkCheckBox(
-            env_frame2, text="",
-            variable=self.min_env_var,
-            command=self._on_min_envelope_changed,
-            width=24
-        )
-        self.min_env_cb.pack(side="left")
-        self.min_env_label = ctk.CTkLabel(env_frame2, text="Show Min Envelope")
-        self.min_env_label.pack(side="left")
-
-        # Hide Source Waveforms checkbox
-        env_frame3 = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        env_frame3.pack(fill="x", pady=(2, 10))
-        self.hide_source_var = ctk.BooleanVar(value=False)
-        self.hide_source_cb = ctk.CTkCheckBox(
-            env_frame3, text="",
-            variable=self.hide_source_var,
-            command=self._on_hide_source_changed,
-            width=24
-        )
-        self.hide_source_cb.pack(side="left")
-        self.hide_source_label = ctk.CTkLabel(env_frame3, text="Hide Source Waveforms")
-        self.hide_source_label.pack(side="left")
-
         # === Waveforms ===
         self._add_section_header("Waveforms")
 
         # Add Waveform button
-        self.add_wave_btn = ctk.CTkButton(
+        self.add_wf_btn = ctk.CTkButton(
             self.sidebar, text="+ Add Waveform",
-            command=self._on_add_waveform
+            command=self._on_add_wf
         )
-        self.add_wave_btn.pack(fill="x", pady=(5, 5))
+        self.add_wf_btn.pack(fill="x", pady=(5, 5))
 
         # Waveform list container
-        self.waveform_list_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.waveform_list_frame.pack(fill="x", pady=(0, 10))
+        self.wf_list_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.wf_list_frame.pack(fill="x", pady=(0, 10))
 
         # === Waveform Parameters ===
         self._add_section_header("Waveform Parameters")
 
-        # Wave Type
+        # Waveform Type
         ctk.CTkLabel(self.sidebar, text="Type").pack(anchor="w", pady=(5, 2))
-        self.wave_type_combo = ctk.CTkComboBox(
+        self.wf_type_combo = ctk.CTkComboBox(
             self.sidebar,
             values=["Sine", "Square", "Sawtooth", "Triangle"],
-            command=self._on_wave_type_changed,
+            command=self._on_wf_type_changed,
             width=200
         )
-        self.wave_type_combo.pack(anchor="w", pady=(0, 5))
-        self.wave_type_combo.set("Sine")
+        self.wf_type_combo.pack(anchor="w", pady=(0, 5))
+        self.wf_type_combo.set("Sine")
+
+        # Wave Duration
+        ctk.CTkLabel(self.sidebar, text="Wave Duration (s)").pack(anchor="w", pady=(5, 2))
+        self.duration_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.duration_frame.pack(fill="x", pady=(0, 5))
+
+        self.duration_entry = ctk.CTkEntry(self.duration_frame, width=120)
+        self.duration_entry.pack(side="left", padx=(0, 5))
+        self.duration_entry.insert(0, str(DEFAULT_DURATION))
+        self.duration_entry.bind("<Return>", self._on_duration_enter)
+        self.duration_entry.bind("<FocusOut>", self._on_duration_enter)
+
+        self.duration_dec_btn = ctk.CTkButton(
+            self.duration_frame, text="-", width=30,
+            command=self._on_duration_dec
+        )
+        self.duration_dec_btn.pack(side="left", padx=2)
+
+        self.duration_inc_btn = ctk.CTkButton(
+            self.duration_frame, text="+", width=30,
+            command=self._on_duration_inc
+        )
+        self.duration_inc_btn.pack(side="left", padx=2)
+
+        # Offset
+        ctk.CTkLabel(self.sidebar, text="Offset").pack(anchor="w", pady=(5, 2))
+        self.offset_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.offset_frame.pack(fill="x", pady=(0, 5))
+
+        self.offset_entry = ctk.CTkEntry(self.offset_frame, width=120)
+        self.offset_entry.pack(side="left", padx=(0, 5))
+        self.offset_entry.insert(0, "5.0")
+        self.offset_entry.bind("<Return>", self._on_offset_enter)
+        self.offset_entry.bind("<FocusOut>", self._on_offset_enter)
+
+        self.offset_dec_btn = ctk.CTkButton(
+            self.offset_frame, text="-", width=30,
+            command=self._on_offset_dec
+        )
+        self.offset_dec_btn.pack(side="left", padx=2)
+
+        self.offset_inc_btn = ctk.CTkButton(
+            self.offset_frame, text="+", width=30,
+            command=self._on_offset_inc
+        )
+        self.offset_inc_btn.pack(side="left", padx=2)
 
         # Frequency
         ctk.CTkLabel(self.sidebar, text="Frequency (Hz)").pack(anchor="w", pady=(5, 2))
-        freq_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        freq_frame.pack(fill="x", pady=(0, 5))
+        self.freq_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.freq_frame.pack(fill="x", pady=(0, 5))
 
-        self.freq_entry = ctk.CTkEntry(freq_frame, width=120)
+        self.freq_entry = ctk.CTkEntry(self.freq_frame, width=120)
         self.freq_entry.pack(side="left", padx=(0, 5))
-        self.freq_entry.insert(0, str(FREQUENCY_MIN))
-        self.freq_entry.bind("<Return>", self._on_frequency_enter)
-        self.freq_entry.bind("<FocusOut>", self._on_frequency_enter)
+        self.freq_entry.insert(0, str(FREQ_MIN))
+        self.freq_entry.bind("<Return>", self._on_freq_enter)
+        self.freq_entry.bind("<FocusOut>", self._on_freq_enter)
 
         self.freq_dec_btn = ctk.CTkButton(
-            freq_frame, text="-", width=30,
-            command=self._on_frequency_decrement
+            self.freq_frame, text="-", width=30,
+            command=self._on_freq_dec
         )
         self.freq_dec_btn.pack(side="left", padx=2)
 
         self.freq_inc_btn = ctk.CTkButton(
-            freq_frame, text="+", width=30,
-            command=self._on_frequency_increment
+            self.freq_frame, text="+", width=30,
+            command=self._on_freq_inc
         )
         self.freq_inc_btn.pack(side="left", padx=2)
 
         # Amplitude
         ctk.CTkLabel(self.sidebar, text="Amplitude").pack(anchor="w", pady=(5, 2))
-        amp_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        amp_frame.pack(fill="x", pady=(0, 5))
+        self.amp_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.amp_frame.pack(fill="x", pady=(0, 5))
 
-        self.amp_entry = ctk.CTkEntry(amp_frame, width=120)
+        self.amp_entry = ctk.CTkEntry(self.amp_frame, width=120)
         self.amp_entry.pack(side="left", padx=(0, 5))
         self.amp_entry.insert(0, "5.0")
-        self.amp_entry.bind("<Return>", self._on_amplitude_enter)
-        self.amp_entry.bind("<FocusOut>", self._on_amplitude_enter)
+        self.amp_entry.bind("<Return>", self._on_amp_enter)
+        self.amp_entry.bind("<FocusOut>", self._on_amp_enter)
 
         self.amp_dec_btn = ctk.CTkButton(
-            amp_frame, text="-", width=30,
-            command=self._on_amplitude_decrement
+            self.amp_frame, text="-", width=30,
+            command=self._on_amp_dec
         )
         self.amp_dec_btn.pack(side="left", padx=2)
 
         self.amp_inc_btn = ctk.CTkButton(
-            amp_frame, text="+", width=30,
-            command=self._on_amplitude_increment
+            self.amp_frame, text="+", width=30,
+            command=self._on_amp_inc
         )
         self.amp_inc_btn.pack(side="left", padx=2)
 
@@ -236,20 +197,65 @@ class WaveformApp(ctk.CTk):
         self.duty_entry = ctk.CTkEntry(self.duty_frame, width=120)
         self.duty_entry.pack(side="left", padx=(0, 5))
         self.duty_entry.insert(0, "50.0")
-        self.duty_entry.bind("<Return>", self._on_duty_cycle_enter)
-        self.duty_entry.bind("<FocusOut>", self._on_duty_cycle_enter)
+        self.duty_entry.bind("<Return>", self._on_duty_enter)
+        self.duty_entry.bind("<FocusOut>", self._on_duty_enter)
 
         self.duty_dec_btn = ctk.CTkButton(
             self.duty_frame, text="-", width=30,
-            command=self._on_duty_cycle_decrement
+            command=self._on_duty_dec
         )
         self.duty_dec_btn.pack(side="left", padx=2)
 
         self.duty_inc_btn = ctk.CTkButton(
             self.duty_frame, text="+", width=30,
-            command=self._on_duty_cycle_increment
+            command=self._on_duty_inc
         )
         self.duty_inc_btn.pack(side="left", padx=2)
+
+        # === Advanced ===
+        self._add_section_header("Advanced")
+
+        # Max Envelope checkbox
+        max_env_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        max_env_frame.pack(fill="x", pady=2)
+        self.show_max_env_var = ctk.BooleanVar(value=False)
+        self.show_max_env_cb = ctk.CTkCheckBox(
+            max_env_frame, text="",
+            variable=self.show_max_env_var,
+            command=self._on_max_env_changed,
+            width=24
+        )
+        self.show_max_env_cb.pack(side="left")
+        self.show_max_env_label = ctk.CTkLabel(max_env_frame, text="Show Max Envelope")
+        self.show_max_env_label.pack(side="left")
+
+        # Min Envelope checkbox
+        min_env_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        min_env_frame.pack(fill="x", pady=2)
+        self.show_min_env_var = ctk.BooleanVar(value=False)
+        self.show_min_env_cb = ctk.CTkCheckBox(
+            min_env_frame, text="",
+            variable=self.show_min_env_var,
+            command=self._on_min_env_changed,
+            width=24
+        )
+        self.show_min_env_cb.pack(side="left")
+        self.show_min_env_label = ctk.CTkLabel(min_env_frame, text="Show Min Envelope")
+        self.show_min_env_label.pack(side="left")
+
+        # Hide Source Waveforms checkbox
+        hide_src_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        hide_src_frame.pack(fill="x", pady=(2, 10))
+        self.hide_src_var = ctk.BooleanVar(value=False)
+        self.hide_src_cb = ctk.CTkCheckBox(
+            hide_src_frame, text="",
+            variable=self.hide_src_var,
+            command=self._on_hide_src_changed,
+            width=24
+        )
+        self.hide_src_cb.pack(side="left")
+        self.hide_src_label = ctk.CTkLabel(hide_src_frame, text="Hide Source Waveforms")
+        self.hide_src_label.pack(side="left")
 
         # === Export ===
         self._add_section_header("Export")
@@ -286,8 +292,13 @@ class WaveformApp(ctk.CTk):
 
         # Embed in tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
-        self.canvas_widget = self.canvas.get_tk_widget()
-        self.canvas_widget.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Add navigation toolbar for pan/zoom
+        toolbar_frame = ctk.CTkFrame(self.plot_frame, fg_color="transparent")
+        toolbar_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
+        self.toolbar.update()
 
     def _create_status_bar(self):
         """Create the status bar."""
@@ -313,227 +324,248 @@ class WaveformApp(ctk.CTk):
 
     # === Callback Methods ===
 
-    def _on_time_span_enter(self, event=None):
-        """Handle time span entry."""
+    def _on_duration_enter(self, event=None):
+        """Handle duration entry."""
         try:
-            value = float(self.time_span_entry.get())
-            value = max(TIME_SPAN_MIN, min(TIME_SPAN_MAX, value))
-            app_state.set_time_span(value)
-            self.time_span_entry.delete(0, "end")
-            self.time_span_entry.insert(0, f"{value:.1f}")
-            self._update_time_span_buttons()
+            value = float(self.duration_entry.get())
+            value = max(DURATION_MIN, min(DURATION_MAX, value))
+            app_state.set_duration(value)
+            self.duration_entry.delete(0, "end")
+            self.duration_entry.insert(0, f"{value:.1f}")
+            self._update_duration_btns()
             self._update_all_plots()
         except ValueError:
-            self.time_span_entry.delete(0, "end")
-            self.time_span_entry.insert(0, f"{app_state.time_span:.1f}")
+            self.duration_entry.delete(0, "end")
+            self.duration_entry.insert(0, f"{app_state.duration:.1f}")
 
-    def _on_time_span_increment(self):
-        """Increment time span."""
-        new_value = min(TIME_SPAN_MAX, app_state.time_span + TIME_SPAN_STEP)
-        app_state.set_time_span(new_value)
-        self.time_span_entry.delete(0, "end")
-        self.time_span_entry.insert(0, f"{new_value:.1f}")
-        self._update_time_span_buttons()
+    def _on_duration_inc(self):
+        """Increment duration."""
+        new_value = min(DURATION_MAX, app_state.duration + DURATION_STEP)
+        app_state.set_duration(new_value)
+        self.duration_entry.delete(0, "end")
+        self.duration_entry.insert(0, f"{new_value:.1f}")
+        self._update_duration_btns()
         self._update_all_plots()
 
-    def _on_time_span_decrement(self):
-        """Decrement time span."""
-        new_value = max(TIME_SPAN_MIN, app_state.time_span - TIME_SPAN_STEP)
-        app_state.set_time_span(new_value)
-        self.time_span_entry.delete(0, "end")
-        self.time_span_entry.insert(0, f"{new_value:.1f}")
-        self._update_time_span_buttons()
+    def _on_duration_dec(self):
+        """Decrement duration."""
+        new_value = max(DURATION_MIN, app_state.duration - DURATION_STEP)
+        app_state.set_duration(new_value)
+        self.duration_entry.delete(0, "end")
+        self.duration_entry.insert(0, f"{new_value:.1f}")
+        self._update_duration_btns()
         self._update_all_plots()
 
-    def _on_show_grid_changed(self):
-        """Handle grid visibility toggle."""
-        app_state.show_grid = self.show_grid_var.get()
-        self._update_all_plots()
-
-    def _on_reset_view(self):
-        """Reset view to defaults."""
-        app_state.set_time_span(DEFAULT_TIME_SPAN)
-        self.time_span_entry.delete(0, "end")
-        self.time_span_entry.insert(0, f"{DEFAULT_TIME_SPAN:.1f}")
-        self._update_time_span_buttons()
-        self._update_all_plots()
-
-    def _on_max_envelope_changed(self):
+    def _on_max_env_changed(self):
         """Handle max envelope toggle."""
-        app_state.show_max_envelope = self.max_env_var.get()
-        self._update_envelope_controls()
+        app_state.show_max_env = self.show_max_env_var.get()
+        self._update_env_controls()
         self._update_all_plots()
 
-    def _on_min_envelope_changed(self):
+    def _on_min_env_changed(self):
         """Handle min envelope toggle."""
-        app_state.show_min_envelope = self.min_env_var.get()
-        self._update_envelope_controls()
+        app_state.show_min_env = self.show_min_env_var.get()
+        self._update_env_controls()
         self._update_all_plots()
 
-    def _on_hide_source_changed(self):
+    def _on_hide_src_changed(self):
         """Handle hide source waveforms toggle."""
-        app_state.hide_source_waveforms = self.hide_source_var.get()
-        self._update_waveform_management_controls()
+        app_state.hide_src_wfs = self.hide_src_var.get()
+        self._update_wf_management_controls()
         self._update_all_plots()
 
-    def _on_add_waveform(self):
+    def _on_add_wf(self):
         """Add a new waveform."""
-        new_waveform = app_state.add_waveform()
-        if new_waveform:
-            self._update_waveform_list()
-            self._update_waveform_parameters()
-            self._update_envelope_controls()
+        new_wf = app_state.add_wf()
+        if new_wf:
+            self._update_wf_list()
+            self._update_wf_parameters()
+            self._update_env_controls()
             self._update_all_plots()
             self._update_add_button()
 
-    def _on_remove_waveform(self, waveform_id: int):
+    def _on_remove_wf(self, wf_id: int):
         """Remove a waveform."""
-        if app_state.remove_waveform(waveform_id):
-            self._update_waveform_list()
-            self._update_waveform_parameters()
-            self._update_envelope_controls()
+        if app_state.remove_wf(wf_id):
+            self._update_wf_list()
+            self._update_wf_parameters()
+            self._update_env_controls()
             self._update_all_plots()
             self._update_add_button()
 
-    def _on_toggle_waveform(self, waveform_id: int):
+    def _on_toggle_wf(self, wf_id: int):
         """Toggle waveform visibility."""
-        waveform = app_state.get_waveform(waveform_id)
-        if waveform:
-            waveform.enabled = not waveform.enabled
-            self._update_envelope_controls()
+        wf = app_state.get_wf(wf_id)
+        if wf:
+            wf.enabled = not wf.enabled
+            self._update_env_controls()
             self._update_all_plots()
-            self._update_waveform_list()
+            self._update_wf_list()
 
-    def _on_select_waveform(self, waveform_id: int):
+    def _on_select_wf(self, wf_id: int):
         """Select a waveform for editing."""
-        app_state.active_waveform_index = waveform_id
-        self._update_waveform_parameters()
-        self._update_waveform_list()
+        app_state.active_wf_index = wf_id
+        self._update_wf_parameters()
+        self._update_wf_list()
 
-    def _on_wave_type_changed(self, value: str):
-        """Handle wave type change."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            waveform.wave_type = value.lower()
-            self._update_waveform_parameters()
+    def _on_wf_type_changed(self, value: str):
+        """Handle waveform type change."""
+        wf = app_state.get_active_wf()
+        if wf:
+            wf.wf_type = value.lower()
+            self._update_wf_parameters()
             self._update_all_plots()
-            self._update_waveform_list()
 
-    def _on_frequency_enter(self, event=None):
+    def _on_freq_enter(self, event=None):
         """Handle frequency entry."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
+        wf = app_state.get_active_wf()
+        if wf:
             try:
                 value = float(self.freq_entry.get())
-                value = max(FREQUENCY_MIN, min(FREQUENCY_MAX, value))
-                waveform.frequency = value
+                value = max(FREQ_MIN, min(FREQ_MAX, value))
+                wf.freq = value
                 self.freq_entry.delete(0, "end")
                 self.freq_entry.insert(0, f"{value:.1f}")
-                self._update_waveform_parameters()
+                self._update_freq_btns()
                 self._update_all_plots()
-                self._update_waveform_list()
             except ValueError:
                 self.freq_entry.delete(0, "end")
-                self.freq_entry.insert(0, f"{waveform.frequency:.1f}")
+                self.freq_entry.insert(0, f"{wf.freq:.1f}")
 
-    def _on_frequency_increment(self):
+    def _on_freq_inc(self):
         """Increment frequency."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            new_value = min(FREQUENCY_MAX, waveform.frequency + FREQUENCY_STEP)
-            waveform.frequency = new_value
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = min(FREQ_MAX, wf.freq + FREQ_STEP)
+            wf.freq = new_value
             self.freq_entry.delete(0, "end")
             self.freq_entry.insert(0, f"{new_value:.1f}")
-            self._update_waveform_parameters()
+            self._update_freq_btns()
             self._update_all_plots()
-            self._update_waveform_list()
 
-    def _on_frequency_decrement(self):
+    def _on_freq_dec(self):
         """Decrement frequency."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            new_value = max(FREQUENCY_MIN, waveform.frequency - FREQUENCY_STEP)
-            waveform.frequency = new_value
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = max(FREQ_MIN, wf.freq - FREQ_STEP)
+            wf.freq = new_value
             self.freq_entry.delete(0, "end")
             self.freq_entry.insert(0, f"{new_value:.1f}")
-            self._update_waveform_parameters()
+            self._update_freq_btns()
             self._update_all_plots()
-            self._update_waveform_list()
 
-    def _on_amplitude_enter(self, event=None):
+    def _on_amp_enter(self, event=None):
         """Handle amplitude entry."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
+        wf = app_state.get_active_wf()
+        if wf:
             try:
                 value = float(self.amp_entry.get())
-                value = max(AMPLITUDE_MIN, min(AMPLITUDE_MAX, value))
-                waveform.amplitude = value
+                value = max(AMP_MIN, min(AMP_MAX, value))
+                wf.amp = value
                 self.amp_entry.delete(0, "end")
                 self.amp_entry.insert(0, f"{value:.1f}")
-                self._update_waveform_parameters()
+                self._update_amp_btns()
                 self._update_all_plots()
             except ValueError:
                 self.amp_entry.delete(0, "end")
-                self.amp_entry.insert(0, f"{waveform.amplitude:.1f}")
+                self.amp_entry.insert(0, f"{wf.amp:.1f}")
 
-    def _on_amplitude_increment(self):
+    def _on_amp_inc(self):
         """Increment amplitude."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            new_value = min(AMPLITUDE_MAX, waveform.amplitude + AMPLITUDE_STEP)
-            waveform.amplitude = new_value
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = min(AMP_MAX, wf.amp + AMP_STEP)
+            wf.amp = new_value
             self.amp_entry.delete(0, "end")
             self.amp_entry.insert(0, f"{new_value:.1f}")
-            self._update_waveform_parameters()
+            self._update_amp_btns()
             self._update_all_plots()
 
-    def _on_amplitude_decrement(self):
+    def _on_amp_dec(self):
         """Decrement amplitude."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            new_value = max(AMPLITUDE_MIN, waveform.amplitude - AMPLITUDE_STEP)
-            waveform.amplitude = new_value
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = max(AMP_MIN, wf.amp - AMP_STEP)
+            wf.amp = new_value
             self.amp_entry.delete(0, "end")
             self.amp_entry.insert(0, f"{new_value:.1f}")
-            self._update_waveform_parameters()
+            self._update_amp_btns()
             self._update_all_plots()
 
-    def _on_duty_cycle_enter(self, event=None):
+    def _on_offset_enter(self, event=None):
+        """Handle offset entry."""
+        wf = app_state.get_active_wf()
+        if wf:
+            try:
+                value = float(self.offset_entry.get())
+                value = max(OFFSET_MIN, min(OFFSET_MAX, value))
+                wf.offset = value
+                self.offset_entry.delete(0, "end")
+                self.offset_entry.insert(0, f"{value:.1f}")
+                self._update_offset_btns()
+                self._update_all_plots()
+            except ValueError:
+                self.offset_entry.delete(0, "end")
+                self.offset_entry.insert(0, f"{wf.offset:.1f}")
+
+    def _on_offset_inc(self):
+        """Increment offset."""
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = min(OFFSET_MAX, wf.offset + OFFSET_STEP)
+            wf.offset = new_value
+            self.offset_entry.delete(0, "end")
+            self.offset_entry.insert(0, f"{new_value:.1f}")
+            self._update_offset_btns()
+            self._update_all_plots()
+
+    def _on_offset_dec(self):
+        """Decrement offset."""
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = max(OFFSET_MIN, wf.offset - OFFSET_STEP)
+            wf.offset = new_value
+            self.offset_entry.delete(0, "end")
+            self.offset_entry.insert(0, f"{new_value:.1f}")
+            self._update_offset_btns()
+            self._update_all_plots()
+
+    def _on_duty_enter(self, event=None):
         """Handle duty cycle entry."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
+        wf = app_state.get_active_wf()
+        if wf:
             try:
                 value = float(self.duty_entry.get())
-                value = max(DUTY_CYCLE_MIN, min(DUTY_CYCLE_MAX, value))
-                waveform.duty_cycle = value
+                value = max(DUTY_MIN, min(DUTY_MAX, value))
+                wf.duty_cycle = value
                 self.duty_entry.delete(0, "end")
                 self.duty_entry.insert(0, f"{value:.1f}")
-                self._update_waveform_parameters()
+                self._update_duty_btns()
                 self._update_all_plots()
             except ValueError:
                 self.duty_entry.delete(0, "end")
-                self.duty_entry.insert(0, f"{waveform.duty_cycle:.1f}")
+                self.duty_entry.insert(0, f"{wf.duty_cycle:.1f}")
 
-    def _on_duty_cycle_increment(self):
+    def _on_duty_inc(self):
         """Increment duty cycle."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            new_value = min(DUTY_CYCLE_MAX, waveform.duty_cycle + DUTY_CYCLE_STEP)
-            waveform.duty_cycle = new_value
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = min(DUTY_MAX, wf.duty_cycle + DUTY_STEP)
+            wf.duty_cycle = new_value
             self.duty_entry.delete(0, "end")
             self.duty_entry.insert(0, f"{new_value:.1f}")
-            self._update_waveform_parameters()
+            self._update_duty_btns()
             self._update_all_plots()
 
-    def _on_duty_cycle_decrement(self):
+    def _on_duty_dec(self):
         """Decrement duty cycle."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            new_value = max(DUTY_CYCLE_MIN, waveform.duty_cycle - DUTY_CYCLE_STEP)
-            waveform.duty_cycle = new_value
+        wf = app_state.get_active_wf()
+        if wf:
+            new_value = max(DUTY_MIN, wf.duty_cycle - DUTY_STEP)
+            wf.duty_cycle = new_value
             self.duty_entry.delete(0, "end")
             self.duty_entry.insert(0, f"{new_value:.1f}")
-            self._update_waveform_parameters()
+            self._update_duty_btns()
             self._update_all_plots()
 
     def _on_export_clicked(self):
@@ -549,47 +581,49 @@ class WaveformApp(ctk.CTk):
             return  # User cancelled
 
         # Collect enabled waveform data
-        waveforms_to_export = []
-        waveform_arrays = []
-        for waveform in app_state.get_enabled_waveforms():
-            time, amplitude = generate_waveform(
-                waveform.wave_type,
-                waveform.frequency,
-                waveform.amplitude,
-                waveform.duty_cycle,
-                app_state.time_span,
+        wfs_to_export = []
+        wf_arrays = []
+        for wf in app_state.get_enabled_wfs():
+            time, amp = gen_wf(
+                wf.wf_type,
+                wf.freq,
+                wf.amp,
+                wf.offset,
+                wf.duty_cycle,
+                app_state.duration,
                 app_state.sample_rate
             )
-            waveform_arrays.append((time, amplitude))
+            wf_arrays.append((time, amp))
 
-            name = f"Waveform_{waveform.id + 1}_{waveform.wave_type.capitalize()}"
-            export_data = prepare_waveform_for_export(
-                name, time, amplitude,
-                waveform.wave_type,
-                waveform.frequency,
-                waveform.amplitude,
-                waveform.duty_cycle
+            name = f"Waveform_{wf.id + 1}_{wf.wf_type.capitalize()}"
+            export_data = prep_wf_for_export(
+                name, time, amp,
+                wf.wf_type,
+                wf.freq,
+                wf.amp,
+                wf.offset,
+                wf.duty_cycle
             )
-            waveforms_to_export.append(export_data)
+            wfs_to_export.append(export_data)
 
         # Collect envelope data if enabled
-        envelopes_to_export = []
-        if app_state.can_show_envelopes() and waveform_arrays:
-            if app_state.show_max_envelope:
-                time, max_env = compute_max_envelope(waveform_arrays)
-                envelopes_to_export.append(("Max_Envelope", time, max_env))
+        envs_to_export = []
+        if app_state.can_show_envelopes() and wf_arrays:
+            if app_state.show_max_env:
+                time, max_env = compute_max_env(wf_arrays)
+                envs_to_export.append(("Max_Envelope", time, max_env))
 
-            if app_state.show_min_envelope:
-                time, min_env = compute_min_envelope(waveform_arrays)
-                envelopes_to_export.append(("Min_Envelope", time, min_env))
+            if app_state.show_min_env:
+                time, min_env = compute_min_env(wf_arrays)
+                envs_to_export.append(("Min_Envelope", time, min_env))
 
         # Export
         success, message = export_to_csv(
             filename,
-            waveforms_to_export,
-            envelopes_to_export if envelopes_to_export else None,
+            wfs_to_export,
+            envs_to_export if envs_to_export else None,
             app_state.sample_rate,
-            app_state.time_span
+            app_state.duration
         )
 
         # Update status
@@ -607,43 +641,41 @@ class WaveformApp(ctk.CTk):
         # Configure axes
         self.ax.set_xlabel("Time (s)")
         self.ax.set_ylabel("Amplitude")
-        self.ax.set_xlim(0, app_state.time_span)
-        self.ax.set_ylim(-12, 12)
-        if app_state.show_grid:
-            self.ax.grid(visible=True, alpha=0.3, color='#666666')
-        else:
-            self.ax.grid(visible=False)
+        self.ax.set_xlim(0, app_state.duration)
+        self.ax.set_ylim(0, 15)
+        self.ax.grid(visible=True, alpha=0.3, color='#666666')
 
         # Generate and plot enabled waveforms
-        waveform_data = []
-        for waveform in app_state.waveforms:
-            if waveform.enabled:
-                time, amplitude = generate_waveform(
-                    waveform.wave_type,
-                    waveform.frequency,
-                    waveform.amplitude,
-                    waveform.duty_cycle,
-                    app_state.time_span,
+        wf_data = []
+        for wf in app_state.wfs:
+            if wf.enabled:
+                time, amp = gen_wf(
+                    wf.wf_type,
+                    wf.freq,
+                    wf.amp,
+                    wf.offset,
+                    wf.duty_cycle,
+                    app_state.duration,
                     app_state.sample_rate
                 )
-                waveform_data.append((time, amplitude))
+                wf_data.append((time, amp))
 
                 # Only plot if not hiding source waveforms
-                if not app_state.hide_source_waveforms:
+                if not app_state.hide_src_wfs:
                     # Convert RGB tuple to matplotlib color format
-                    color = tuple(c / 255 for c in waveform.color)
-                    label = f"Waveform {waveform.id + 1}"
-                    self.ax.plot(time, amplitude, color=color, label=label, linewidth=2)
+                    color = tuple(c / 255 for c in wf.color)
+                    label = f"Waveform {wf.id + 1}"
+                    self.ax.plot(time, amp, color=color, label=label, linewidth=2)
 
         # Plot envelopes
-        if app_state.can_show_envelopes() and waveform_data:
-            if app_state.show_max_envelope:
-                time, max_env = compute_max_envelope(waveform_data)
+        if app_state.can_show_envelopes() and wf_data:
+            if app_state.show_max_env:
+                time, max_env = compute_max_env(wf_data)
                 self.ax.plot(time, max_env, color='darkblue', label='Max Envelope',
                            linewidth=2, linestyle='--')
 
-            if app_state.show_min_envelope:
-                time, min_env = compute_min_envelope(waveform_data)
+            if app_state.show_min_env:
+                time, min_env = compute_min_env(wf_data)
                 self.ax.plot(time, min_env, color='red', label='Min Envelope',
                            linewidth=2, linestyle='--')
 
@@ -657,183 +689,195 @@ class WaveformApp(ctk.CTk):
         # Update status bar
         self._update_status_bar()
 
-    def _update_waveform_list(self):
+    def _update_wf_list(self):
         """Update the waveform list UI."""
         # Clear existing widgets safely
-        children = list(self.waveform_list_frame.winfo_children())
+        children = list(self.wf_list_frame.winfo_children())
         for widget in children:
             try:
                 widget.destroy()
             except Exception:
                 pass
 
-        self.waveform_buttons = []
+        self.wf_buttons = []
         self.toggle_buttons = []
         self.remove_buttons = []
 
-        for waveform in app_state.waveforms:
-            row_frame = ctk.CTkFrame(self.waveform_list_frame, fg_color="transparent")
+        for wf in app_state.wfs:
+            row_frame = ctk.CTkFrame(self.wf_list_frame, fg_color="transparent")
             row_frame.pack(fill="x", pady=2)
 
             # Selection button
-            is_selected = waveform.id == app_state.active_waveform_index
+            is_selected = wf.id == app_state.active_wf_index
             fg_color = "#3d3d6b" if is_selected else "#2b2b2b"
             border_color = "#6496ff" if is_selected else "#2b2b2b"
             border_width = 2 if is_selected else 0
 
-            wave_btn = ctk.CTkButton(
+            wf_btn = ctk.CTkButton(
                 row_frame,
-                text=f"Waveform {waveform.id + 1}",
+                text=f"Waveform {wf.id + 1}",
                 width=180,
                 fg_color=fg_color,
                 border_color=border_color,
                 border_width=border_width,
-                command=lambda wid=waveform.id: self._on_select_waveform(wid)
+                command=lambda wid=wf.id: self._on_select_wf(wid)
             )
-            wave_btn.pack(side="left", padx=(0, 5))
-            self.waveform_buttons.append(wave_btn)
+            wf_btn.pack(side="left", padx=(0, 5))
+            self.wf_buttons.append(wf_btn)
 
-            # Toggle button
-            toggle_text = "ON" if waveform.enabled else "OFF"
-            toggle_color = "#009600" if waveform.enabled else "#646464"
-            toggle_btn = ctk.CTkButton(
+            # Visibility toggle button
+            vis_text = "ON" if wf.enabled else "OFF"
+            vis_color = "#009600" if wf.enabled else "#646464"
+            vis_btn = ctk.CTkButton(
                 row_frame,
-                text=toggle_text,
+                text=vis_text,
                 width=40,
-                fg_color=toggle_color,
-                command=lambda wid=waveform.id: self._on_toggle_waveform(wid)
+                fg_color=vis_color,
+                command=lambda wid=wf.id: self._on_toggle_wf(wid)
             )
-            toggle_btn.pack(side="left", padx=2)
-            self.toggle_buttons.append(toggle_btn)
+            vis_btn.pack(side="left", padx=2)
+            self.toggle_buttons.append(vis_btn)
 
             # Remove button (only show if more than 1 waveform)
-            if len(app_state.waveforms) > app_state.MIN_WAVEFORMS:
-                is_enabled = not app_state.hide_source_waveforms
+            if len(app_state.wfs) > app_state.MIN_WFS:
+                is_enabled = not app_state.hide_src_wfs
                 remove_btn = ctk.CTkButton(
                     row_frame,
                     text="X",
                     width=30,
                     fg_color="#8B0000" if is_enabled else "#646464",
                     state="normal" if is_enabled else "disabled",
-                    command=lambda wid=waveform.id: self._on_remove_waveform(wid)
+                    command=lambda wid=wf.id: self._on_remove_wf(wid)
                 )
                 remove_btn.pack(side="left", padx=2)
                 self.remove_buttons.append(remove_btn)
 
-    def _update_waveform_parameters(self):
+    def _update_wf_parameters(self):
         """Update waveform parameter inputs based on active waveform."""
-        waveform = app_state.get_active_waveform()
-        if not waveform:
+        wf = app_state.get_active_wf()
+        if not wf:
             return
 
         # Update entry fields
         self.freq_entry.delete(0, "end")
-        self.freq_entry.insert(0, f"{waveform.frequency:.1f}")
+        self.freq_entry.insert(0, f"{wf.freq:.1f}")
 
         self.amp_entry.delete(0, "end")
-        self.amp_entry.insert(0, f"{waveform.amplitude:.1f}")
+        self.amp_entry.insert(0, f"{wf.amp:.1f}")
+
+        self.offset_entry.delete(0, "end")
+        self.offset_entry.insert(0, f"{wf.offset:.1f}")
 
         self.duty_entry.delete(0, "end")
-        self.duty_entry.insert(0, f"{waveform.duty_cycle:.1f}")
+        self.duty_entry.insert(0, f"{wf.duty_cycle:.1f}")
 
-        self.wave_type_combo.set(waveform.wave_type.capitalize())
+        self.wf_type_combo.set(wf.wf_type.capitalize())
 
         # Update button states
-        self._update_frequency_buttons()
-        self._update_amplitude_buttons()
-        self._update_duty_cycle_buttons()
+        self._update_freq_btns()
+        self._update_amp_btns()
+        self._update_offset_btns()
+        self._update_duty_btns()
 
         # Show/hide duty cycle for square waves
-        needs_duty = waveform.wave_type.lower() == 'square'
+        needs_duty = wf.wf_type.lower() == 'square'
         if needs_duty:
-            self.duty_label.pack(anchor="w", pady=(5, 2))
-            self.duty_frame.pack(fill="x", pady=(0, 5))
+            self.duty_label.pack(anchor="w", pady=(5, 2), after=self.amp_frame)
+            self.duty_frame.pack(fill="x", pady=(0, 5), after=self.duty_label)
         else:
             self.duty_label.pack_forget()
             self.duty_frame.pack_forget()
 
-    def _update_time_span_buttons(self):
-        """Update time span button states."""
-        at_min = app_state.time_span <= TIME_SPAN_MIN
-        at_max = app_state.time_span >= TIME_SPAN_MAX
-        self.time_dec_btn.configure(state="disabled" if at_min else "normal")
-        self.time_inc_btn.configure(state="disabled" if at_max else "normal")
+    def _update_duration_btns(self):
+        """Update duration button states."""
+        at_min = app_state.duration <= DURATION_MIN
+        at_max = app_state.duration >= DURATION_MAX
+        self.duration_dec_btn.configure(state="disabled" if at_min else "normal")
+        self.duration_inc_btn.configure(state="disabled" if at_max else "normal")
 
-    def _update_frequency_buttons(self):
+    def _update_freq_btns(self):
         """Update frequency button states."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            at_min = waveform.frequency <= FREQUENCY_MIN
-            at_max = waveform.frequency >= FREQUENCY_MAX
+        wf = app_state.get_active_wf()
+        if wf:
+            at_min = wf.freq <= FREQ_MIN
+            at_max = wf.freq >= FREQ_MAX
             self.freq_dec_btn.configure(state="disabled" if at_min else "normal")
             self.freq_inc_btn.configure(state="disabled" if at_max else "normal")
 
-    def _update_amplitude_buttons(self):
+    def _update_amp_btns(self):
         """Update amplitude button states."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            at_min = waveform.amplitude <= AMPLITUDE_MIN
-            at_max = waveform.amplitude >= AMPLITUDE_MAX
+        wf = app_state.get_active_wf()
+        if wf:
+            at_min = wf.amp <= AMP_MIN
+            at_max = wf.amp >= AMP_MAX
             self.amp_dec_btn.configure(state="disabled" if at_min else "normal")
             self.amp_inc_btn.configure(state="disabled" if at_max else "normal")
 
-    def _update_duty_cycle_buttons(self):
+    def _update_offset_btns(self):
+        """Update offset button states."""
+        wf = app_state.get_active_wf()
+        if wf:
+            at_min = wf.offset <= OFFSET_MIN
+            at_max = wf.offset >= OFFSET_MAX
+            self.offset_dec_btn.configure(state="disabled" if at_min else "normal")
+            self.offset_inc_btn.configure(state="disabled" if at_max else "normal")
+
+    def _update_duty_btns(self):
         """Update duty cycle button states."""
-        waveform = app_state.get_active_waveform()
-        if waveform:
-            at_min = waveform.duty_cycle <= DUTY_CYCLE_MIN
-            at_max = waveform.duty_cycle >= DUTY_CYCLE_MAX
+        wf = app_state.get_active_wf()
+        if wf:
+            at_min = wf.duty_cycle <= DUTY_MIN
+            at_max = wf.duty_cycle >= DUTY_MAX
             self.duty_dec_btn.configure(state="disabled" if at_min else "normal")
             self.duty_inc_btn.configure(state="disabled" if at_max else "normal")
 
-    def _update_envelope_controls(self):
+    def _update_env_controls(self):
         """Enable/disable envelope checkboxes based on number of enabled waveforms."""
         can_show = app_state.can_show_envelopes()
 
         # Update max envelope checkbox
-        self.max_env_cb.configure(state="normal" if can_show else "disabled")
-        self.max_env_label.configure(
+        self.show_max_env_cb.configure(state="normal" if can_show else "disabled")
+        self.show_max_env_label.configure(
             text_color=ENABLED_TEXT_COLOR if can_show else DISABLED_TEXT_COLOR
         )
 
         # Update min envelope checkbox
-        self.min_env_cb.configure(state="normal" if can_show else "disabled")
-        self.min_env_label.configure(
+        self.show_min_env_cb.configure(state="normal" if can_show else "disabled")
+        self.show_min_env_label.configure(
             text_color=ENABLED_TEXT_COLOR if can_show else DISABLED_TEXT_COLOR
         )
 
         # Hide source checkbox requires at least one envelope to be shown
-        can_hide_source = can_show and (app_state.show_max_envelope or app_state.show_min_envelope)
-        self.hide_source_cb.configure(state="normal" if can_hide_source else "disabled")
-        self.hide_source_label.configure(
-            text_color=ENABLED_TEXT_COLOR if can_hide_source else DISABLED_TEXT_COLOR
+        can_hide_src = can_show and (app_state.show_max_env or app_state.show_min_env)
+        self.hide_src_cb.configure(state="normal" if can_hide_src else "disabled")
+        self.hide_src_label.configure(
+            text_color=ENABLED_TEXT_COLOR if can_hide_src else DISABLED_TEXT_COLOR
         )
 
         # If hide source becomes disabled, turn it off
-        if not can_hide_source:
-            if app_state.hide_source_waveforms:
-                app_state.hide_source_waveforms = False
-                self._update_waveform_management_controls()
-            self.hide_source_var.set(False)
+        if not can_hide_src:
+            if app_state.hide_src_wfs:
+                app_state.hide_src_wfs = False
+                self._update_wf_management_controls()
+            self.hide_src_var.set(False)
 
         if not can_show:
-            app_state.show_max_envelope = False
-            app_state.show_min_envelope = False
-            self.max_env_var.set(False)
-            self.min_env_var.set(False)
+            app_state.show_max_env = False
+            app_state.show_min_env = False
+            self.show_max_env_var.set(False)
+            self.show_min_env_var.set(False)
 
     def _update_add_button(self):
-        """Enable/disable add waveform button based on max limit."""
-        can_add = len(app_state.waveforms) < app_state.MAX_WAVEFORMS
-        self.add_wave_btn.configure(state="normal" if can_add else "disabled")
+        """Enable/disable add waveform button based on max limit and hide_src state."""
+        can_add = len(app_state.wfs) < app_state.MAX_WFS and not app_state.hide_src_wfs
+        self.add_wf_btn.configure(state="normal" if can_add else "disabled")
 
-    def _update_waveform_management_controls(self):
-        """Enable/disable waveform management controls based on hide_source state."""
-        enabled = not app_state.hide_source_waveforms
-        self.add_wave_btn.configure(state="normal" if enabled else "disabled")
-        self._update_waveform_list()
+    def _update_wf_management_controls(self):
+        """Enable/disable waveform management controls based on hide_src state."""
+        self._update_add_button()
+        self._update_wf_list()
 
     def _update_status_bar(self):
         """Update status bar with current info."""
-        num_waveforms = len(app_state.waveforms)
-        self.status_bar.configure(text=f"Waveforms: {num_waveforms}/{app_state.MAX_WAVEFORMS}")
+        num_wfs = len(app_state.wfs)
+        self.status_bar.configure(text=f"Waveforms: {num_wfs}/{app_state.MAX_WFS}")

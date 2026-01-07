@@ -35,10 +35,10 @@ env\Scripts\python.exe main.py
 2. **Adjust waveform parameters:**
    - Use the **Frequency** slider to change the wave frequency (1-100 Hz)
    - Use the **Amplitude** slider to adjust the wave amplitude (0-10)
-   - For Square/Pulse waves, use the **Duty Cycle** slider (1-100%)
+   - For Square waves, use the **Duty Cycle** slider (1-100%)
 
 3. **Change waveform type:**
-   - Use the **Type** dropdown to select: Sine, Square, Pulse, Sawtooth, or Triangle
+   - Use the **Type** dropdown to select: Sine, Square, Sawtooth, or Triangle
 
 4. **Add more waveforms:**
    - Click **+ Add Waveform** button (max 5 waveforms)
@@ -46,7 +46,7 @@ env\Scripts\python.exe main.py
 
 5. **Manage waveforms:**
    - Click on a waveform in the list to select and edit it
-   - Click the **eye icon (👁)** to show/hide a waveform
+   - Click the **ON/OFF button** to show/hide a waveform
    - Click the **X button** to remove a waveform (minimum 1 required)
 
 ### Envelope Analysis
@@ -58,31 +58,36 @@ When you have 2 or more **enabled** waveforms:
 
 Both envelopes can be enabled simultaneously.
 
-### Global Controls
+### Waveform Parameters
 
-- **Time Span** - Adjusts the time window for visualization (0.1-10 seconds)
-- **Auto-scale Y-axis** - Automatically adjusts the plot's vertical scale
-- **Show Grid** - Toggles grid display on the plot
+Each waveform has the following adjustable parameters:
+
+- **Type** - Waveform type (Sine, Square, Sawtooth, Triangle)
+- **Wave Duration** - Adjusts the time window for visualization (0.5-120 seconds)
+- **Frequency** - Wave frequency in Hz (0.1-100 Hz)
+- **Amplitude** - Wave amplitude (0-10)
+- **Offset** - Y-axis offset (0-10)
+- **Duty Cycle** - For Square waves only (1-100%)
 
 ### Exporting Data
 
-1. Enter a filename in the **Filename** field (e.g., `my_data.csv`)
-2. Click **Export to CSV**
-3. The file will be saved in the application directory
-4. Exported data includes:
+1. Click **Export to CSV**
+2. A native file dialog will open - choose your save location and filename
+3. Exported data includes:
    - All enabled waveforms
    - Active envelopes (if enabled)
    - Metadata (waveform type, frequency, amplitude, etc.)
 
 ## Features
 
-- **5 Waveform Types:** Sine, Square, Pulse, Sawtooth, Triangle
+- **4 Waveform Types:** Sine, Square, Sawtooth, Triangle
 - **Up to 5 simultaneous waveforms**
-- **Real-time visualization** with >30 FPS performance
+- **Real-time visualization** with responsive performance
 - **Envelope analysis** (Max/Min envelopes)
-- **CSV export** with full metadata
+- **CSV export** with native OS file dialog
 - **Independent waveform control**
-- **Auto-scaling and grid display**
+- **Modern Windows 11 UI** with CustomTkinter
+- **Dark theme** matplotlib plotting
 
 ## File Structure
 
@@ -102,11 +107,12 @@ waveform_generator/
 
 - Python 3.11 or higher
 - Windows/Linux/macOS
-- Minimum resolution: 1000x600 (recommended: 1200x800)
+- Minimum resolution: 1000x800 (recommended: 1200x950)
 
 ## Dependencies
 
-- **DearPyGui** >= 1.10.0 - GUI framework
+- **CustomTkinter** >= 5.2.0 - Modern GUI framework
+- **matplotlib** >= 3.8.0 - Plotting library
 - **NumPy** >= 1.24.0 - Numerical computing
 - **SciPy** >= 1.11.0 - Signal processing
 
@@ -119,7 +125,7 @@ waveform_generator/
 
 ## Keyboard Shortcuts
 
-- Use sliders with arrow keys for fine control
+- Use +/- buttons for fine control of parameters
 - Click and drag on the plot to pan
 - Scroll to zoom in/out on the plot
 
@@ -132,7 +138,7 @@ waveform_generator/
 
 **Performance issues:**
 - Reduce the number of visible waveforms
-- Decrease the time span
+- Decrease the wave duration
 - Disable envelopes if not needed
 
 **Export fails:**

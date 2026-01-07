@@ -10,7 +10,7 @@ from datetime import datetime
 import re
 
 
-def sanitize_filename(filepath: str) -> str:
+def sanitize_fname(filepath: str) -> str:
     """
     Sanitize filepath by removing invalid characters from the filename portion
     and ensuring .csv extension.
@@ -37,7 +37,7 @@ def sanitize_filename(filepath: str) -> str:
 
     # Default name if empty
     if filename == '.csv':
-        filename = 'waveforms.csv'
+        filename = 'wfs.csv'
 
     # Reconstruct full path if directory was provided
     if directory:
@@ -47,73 +47,75 @@ def sanitize_filename(filepath: str) -> str:
 
 def export_to_csv(
     filename: str,
-    waveforms: List[Tuple[str, np.ndarray, np.ndarray, dict]],
-    envelopes: Optional[List[Tuple[str, np.ndarray, np.ndarray]]] = None,
+    wfs: List[Tuple[str, np.ndarray, np.ndarray, dict]],
+    envs: Optional[List[Tuple[str, np.ndarray, np.ndarray]]] = None,
     sample_rate: int = 1000,
-    duration: float = 1.0
+    dur: float = 1.0
 ) -> Tuple[bool, str]:
     """
     Export waveform data to CSV file.
 
     Args:
         filename: Destination filename
-        waveforms: List of (name, time, amplitude, params) tuples
-        envelopes: Optional list of (name, time, amplitude) tuples for envelopes
+        wfs: List of (name, time, amplitude, params) tuples
+        envs: Optional list of (name, time, amplitude) tuples for envelopes
         sample_rate: Sample rate in samples/second
-        duration: Duration in seconds
+        dur: Duration in seconds
 
     Returns:
         Tuple of (success: bool, message: str)
     """
     try:
         # Sanitize filename
-        filename = sanitize_filename(filename)
+        filename = sanitize_fname(filename)
 
         # Prepare header
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         lines = [f"# Exported: {timestamp}"]
 
         # Add waveform metadata
-        for name, _, _, params in waveforms:
+        for name, _, _, params in wfs:
+            # Combine amplitude and offset for display
+            total_amp = params['amp'] + params['offset']
             metadata_parts = [
-                f"# {name}: {params['wave_type'].capitalize()}",
-                f"{params['frequency']} Hz",
-                f"{params['amplitude']} amplitude"
+                f"# {name}: {params['wf_type'].capitalize()}",
+                f"{params['freq']} Hz",
+                f"{total_amp} amp"
             ]
 
             # Add duty cycle if applicable
-            if params['wave_type'].lower() in ['square', 'pulse']:
+            if params['wf_type'].lower() == 'square':
                 metadata_parts.append(f"{params['duty_cycle']}% duty cycle")
 
             lines.append(", ".join(metadata_parts))
 
         # Add envelope metadata
-        if envelopes:
-            num_waveforms = len(waveforms)
-            for env_name, _, _ in envelopes:
+        if envs:
+            num_wfs = len(wfs)
+            for env_name, _, _ in envs:
                 lines.append(
-                    f"# {env_name}: Computed from {num_waveforms} waveforms"
+                    f"# {env_name}: Computed from {num_wfs} waveforms"
                 )
 
         # Add sample rate and duration
-        lines.append(f"# Sample Rate: {sample_rate} S/s, Duration: {duration}s")
+        lines.append(f"# Sample Rate: {sample_rate} S/s, Duration: {dur}s")
 
         # Create column headers
         headers = ["Time (s)"]
-        for name, _, _, _ in waveforms:
+        for name, _, _, _ in wfs:
             headers.append(name)
 
-        if envelopes:
-            for env_name, _, _ in envelopes:
+        if envs:
+            for env_name, _, _ in envs:
                 headers.append(env_name)
 
         lines.append(",".join(headers))
 
         # Get time array (shared time base)
-        if waveforms:
-            time = waveforms[0][1]
-        elif envelopes:
-            time = envelopes[0][1]
+        if wfs:
+            time = wfs[0][1]
+        elif envs:
+            time = envs[0][1]
         else:
             return False, "No data to export"
 
@@ -123,13 +125,13 @@ def export_to_csv(
             row = [f"{time[i]:.6f}"]
 
             # Add waveform amplitudes
-            for _, _, amplitude, _ in waveforms:
-                row.append(f"{amplitude[i]:.6f}")
+            for _, _, amp, _ in wfs:
+                row.append(f"{amp[i]:.6f}")
 
             # Add envelope amplitudes
-            if envelopes:
-                for _, _, amplitude in envelopes:
-                    row.append(f"{amplitude[i]:.6f}")
+            if envs:
+                for _, _, amp in envs:
+                    row.append(f"{amp[i]:.6f}")
 
             lines.append(",".join(row))
 
@@ -147,13 +149,14 @@ def export_to_csv(
         return False, f"Export failed: {str(e)}"
 
 
-def prepare_waveform_for_export(
+def prep_wf_for_export(
     name: str,
     time: np.ndarray,
-    amplitude: np.ndarray,
-    wave_type: str,
-    frequency: float,
-    amplitude_val: float,
+    amp_array: np.ndarray,
+    wf_type: str,
+    freq: float,
+    amp: float,
+    offset: float = 0.0,
     duty_cycle: float = 50.0
 ) -> Tuple[str, np.ndarray, np.ndarray, dict]:
     """
@@ -162,20 +165,22 @@ def prepare_waveform_for_export(
     Args:
         name: Waveform name
         time: Time array
-        amplitude: Amplitude array
-        wave_type: Type of waveform
-        frequency: Frequency in Hz
-        amplitude_val: Amplitude value
-        duty_cycle: Duty cycle percentage (for square/pulse)
+        amp_array: Amplitude array
+        wf_type: Type of waveform
+        freq: Frequency in Hz
+        amp: Amplitude value
+        offset: Y-axis offset
+        duty_cycle: Duty cycle percentage (for square only)
 
     Returns:
         Tuple of (name, time, amplitude, params_dict)
     """
     params = {
-        'wave_type': wave_type,
-        'frequency': frequency,
-        'amplitude': amplitude_val,
+        'wf_type': wf_type,
+        'freq': freq,
+        'amp': amp,
+        'offset': offset,
         'duty_cycle': duty_cycle
     }
 
-    return (name, time, amplitude, params)
+    return (name, time, amp_array, params)

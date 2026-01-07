@@ -2,7 +2,7 @@
 
 **Version:** 1.0  
 **Target Users:** Engineers visualizing up to 5 independent waveforms with envelope analysis  
-**Tech Stack:** Python 3.11+, DearPyGui 1.10+, NumPy 1.24+, SciPy 1.11+
+**Tech Stack:** Python 3.11+, NumPy 1.24+, SciPy 1.11+, CustomTkinter 5.2+, matplotlib 3.8+
 
 ---
 
@@ -20,10 +20,10 @@ python main.py
 ### Module Responsibilities
 | Module | Purpose | What It Does | What It Doesn't Do |
 |--------|---------|--------------|-------------------|
-| `main.py` | Entry point | DearPyGui context, main loop | No UI creation, no business logic |
+| `main.py` | Entry point | CustomTkinter context, main loop | No UI creation, no business logic |
 | `app_state.py` | State manager | Global state, waveform state | No UI, no calculations |
 | `waveform_generator.py` | Pure functions | Wave/envelope generation | No state, no UI |
-| `ui_components.py` | UI layer | All `dpg.add_*` calls, callbacks | No calculations |
+| `ui_components.py` | UI layer | CustomTkinter widgets, matplotlib plots, callbacks | No calculations |
 | `data_export.py` | Export logic | CSV generation | No UI |
 
 ### Data Flow (Core Pattern)
@@ -34,11 +34,12 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ```
 
 ### Design Constraints (Never Violate)
-- ✅ DearPyGui only (no matplotlib mixing)
+- ✅ CustomTkinter for the UI (modern Windows 11 look)
+- ✅ matplotlib for plotting (dark theme)
+- ✅ Native OS file dialogs for export
 - ✅ NumPy only (no Pandas for CSV)
 - ✅ All waveforms share same time base
 - ✅ Separate UI from logic/calculations
-- ✅ Use tags for all updatable UI elements
 - ✅ Windows compatible
 
 ### Performance SLAs
@@ -70,10 +71,10 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 **So that** I can experiment and see immediate visual feedback
 
 **Acceptance Criteria:**
-- ✅ Frequency: 1-100 Hz, slider step 0.1 Hz
+- ✅ Frequency: 0.1-100 Hz, slider step 0.1 Hz
 - ✅ Amplitude: 0-10, slider step 0.1
 - ✅ Duty Cycle: 1-100%, slider step 1% (only for Square waves)
-- ✅ Time Span: 0.1-120 seconds, slider step 0.5s
+- ✅ Wave Duration: 0.5-120 seconds, step 0.5s
 - ✅ All plots update immediately on parameter change (<100ms latency)
 - ✅ Current values displayed clearly next to each slider
 
@@ -117,7 +118,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ### Supported Waveforms
 | Type | Required Parameters | Optional Parameters |
 |------|-------------------|-------------------|
-| Sine | frequency (1-100 Hz), amplitude (0-10) | - |
+| Sine | frequency (0.1-100 Hz), amplitude (0-10) | - |
 | Square | frequency, amplitude | duty_cycle (1-100%, default 50%) |
 | Sawtooth | frequency, amplitude | - |
 | Triangle | frequency, amplitude | - |
@@ -143,7 +144,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 {
     "id": int,              # 0-4
     "wave_type": str,       # "sine" | "square" | "sawtooth" | "triangle"
-    "frequency": float,     # 1.0-100.0 Hz
+    "frequency": float,     # 0.1-100.0 Hz
     "amplitude": float,     # 0.0-10.0
     "duty_cycle": float,    # 1.0-100.0% (Square only)
     "color": tuple,         # (R, G, B) auto-assigned
@@ -154,7 +155,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ### Global State
 ```python
 {
-    "time_span": float,              # 1-100.0 seconds
+    "duration": float,               # 0.5-120.0 seconds (wave duration)
     "sample_rate": int,              # 1000 (fixed)
     "active_waveform_index": int,    # Which waveform controls are shown
     "show_max_envelope": bool,       # MaxEnvelope visibility
@@ -163,37 +164,34 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ```
 
 ### Initial State (Startup)
-- 1 Sine waveform: 5.0 Hz, 5.0 amplitude, Yellow, enabled
-- time_span: 1.0s, Grid: ON, Auto-scale: ON, Envelopes: OFF
+- 1 Sine waveform: 1.0 Hz, 5.0 amplitude, Yellow, enabled
+- duration: 10.0s, Envelopes: OFF
 
 ---
 
 ## UI Specification
 
-### Layout (1200x800 minimum, Dark Theme #1a1a1a)
+### Layout (1200x900 default, 1000x700 minimum, Dark Theme #1a1a1a)
 
-**Sidebar (300px):**
+**Sidebar (330px, scrollable):**
 ```
-┌─ Global Controls ────────────┐
-│ Time Span: [====|=====] 1.0s │
-│ ☑ Auto-scale Y-axis          │
-│ ☑ Show Grid                  │
-│ ☐ Show MaxEnvelope (disabled)│  ← Disabled when ≤1 waveform
-│ ☐ Show MinEnvelope (disabled)│
-├─ Waveforms ──────────────────┤
+┌─ Waveforms ──────────────────┐
 │ [+ Add Waveform]             │  ← Max 5
-│ ● Sine 5.0 Hz        👁 [X]  │  ← Click=select, eye=toggle, X=remove
-│ ○ Square 10.0 Hz     👁 [X]  │  ← Grayed if disabled
-├─ Waveform Controls ──────────┤  ← Shows selected waveform
+│ [Waveform 1    ] [ON] [X]    │  ← Click=select, ON/OFF=toggle, X=remove
+│ [Waveform 2    ] [OFF][X]    │
+├─ Waveform Parameters ────────┤  ← Shows selected waveform
 │ Type: [Sine ▼]               │
-│ Frequency: [====|===] 5.0 Hz │
-│ Amplitude: [====|===] 5.0    │
+│ Wave Duration: [input][-][+] │  ← 0.5-120 seconds
+│ Frequency: [input] [-] [+]   │
+│ Amplitude: [input] [-] [+]   │
+│ Offset: [input] [-] [+]      │
 │ Duty Cycle: (hidden for Sine)│
+├─ Advanced ───────────────────┤
+│ ☐ Show Max Envelope          │  ← Disabled when ≤1 waveform
+│ ☐ Show Min Envelope          │
+│ ☐ Hide Source Waveforms      │  ← Disabled unless envelope shown
 ├─ Export ─────────────────────┤
-│ Filename: [waveforms.csv]    │
-│ ☑ Waveform 1 ☑ Waveform 2   │
-│ ☑ Max Envelope (if enabled)  │
-│ [Export]                     │
+│ [Export to CSV]              │  ← Opens native OS file dialog
 │ Status: Ready                │
 └──────────────────────────────┘
 ```
@@ -256,26 +254,43 @@ def compute_min_envelope(waveforms: list[tuple[np.ndarray, np.ndarray]]):
     return time, np.min(np.array([w[1] for w in waveforms]), axis=0)
 ```
 
-### DearPyGui Patterns
+### CustomTkinter + matplotlib Patterns
 ```python
-# Create plot with series
-with dpg.plot(label="Waveforms", height=-1, width=-1):
-    dpg.add_plot_legend()
-    dpg.add_plot_axis(dpg.mvXAxis, label="Time (s)")
-    y_axis = dpg.add_plot_axis(dpg.mvYAxis, label="Amplitude", tag="y_axis")
-    dpg.add_line_series([], [], label="Waveform 1", parent="y_axis", tag="wave1_series")
+import customtkinter as ctk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
 
-# Update existing series
-dpg.set_value("wave1_series", [time.tolist(), amplitude.tolist()])
+# Configure appearance
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
-# Slider with callback
-dpg.add_slider_float(
-    label="Frequency (Hz)", 
-    default_value=5.0, 
-    min_value=1.0, 
-    max_value=100.0,
-    callback=on_frequency_changed,
-    tag="freq_slider"
+# Create matplotlib figure with dark theme
+plt.style.use('dark_background')
+fig = Figure(figsize=(8, 6), facecolor='#1a1a1a')
+ax = fig.add_subplot(111)
+canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew")
+
+# Plot waveforms
+ax.clear()
+ax.plot(time, amplitude, color=color, label=label, linewidth=2)
+ax.set_xlabel("Time (s)")
+ax.set_ylabel("Amplitude")
+ax.legend()
+canvas.draw()
+
+# Entry with +/- buttons
+freq_entry = ctk.CTkEntry(frame, width=120)
+freq_dec_btn = ctk.CTkButton(frame, text="-", width=30, command=on_decrement)
+freq_inc_btn = ctk.CTkButton(frame, text="+", width=30, command=on_increment)
+
+# Native file dialog for export
+from tkinter import filedialog
+filename = filedialog.asksaveasfilename(
+    defaultextension=".csv",
+    filetypes=[("CSV files", "*.csv")],
+    initialfile="waveforms.csv"
 )
 ```
 
@@ -319,7 +334,7 @@ Time (s),Waveform_1_Sine,Waveform_2_Square,Max_Envelope
 - [ ] All 5 wave types render correctly
 - [ ] Edge cases: min/max frequency (1 Hz, 100 Hz), min/max amplitude (0, 10)
 - [ ] Duty cycle: 1%, 50%, 100% for Square
-- [ ] Time span: 0.1s, 1s, 10s
+- [ ] Wave duration: 0.5s, 10s, 120s
 - [ ] Envelopes: Test with 2, 3, 5 waveforms (same phase, opposite phase)
 - [ ] Mixed enabled/disabled waveforms
 - [ ] Toggle max/min independently and together
@@ -395,7 +410,6 @@ Time (s),Waveform_1_Sine,Waveform_2_Square,Max_Envelope
 ## Common Pitfall Avoidance
 
 ### Don't:
-- ❌ Mix matplotlib with DearPyGui
 - ❌ Use Pandas for CSV (NumPy only)
 - ❌ Create separate time bases per waveform
 - ❌ Put business logic in UI layer

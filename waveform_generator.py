@@ -10,182 +10,196 @@ from scipy import signal
 from typing import Tuple, List
 
 
-def generate_sine_wave(
-    frequency: float,
-    amplitude: float,
-    duration: float = 1.0,
+def gen_sine_wf(
+    freq: float,
+    amp: float,
+    offset: float = 0.0,
+    dur: float = 1.0,
     sample_rate: int = 1000
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate a sine wave.
+    Generate a sine waveform with configurable y-axis offset.
 
     Args:
-        frequency: Frequency in Hz (1.0-100.0)
-        amplitude: Amplitude (0.0-10.0)
-        duration: Duration in seconds
+        freq: Frequency in Hz (0.1-100.0)
+        amp: Amplitude (0.0-10.0), waveform ranges from offset to offset+amp
+        offset: Y-axis offset (0.0-10.0)
+        dur: Duration in seconds
         sample_rate: Samples per second
 
     Returns:
         Tuple of (time array, amplitude array)
     """
-    time = np.linspace(0, duration, int(sample_rate * duration))
-    wave = amplitude * np.sin(2 * np.pi * frequency * time)
-    return time, wave
+    time = np.linspace(0, dur, int(sample_rate * dur))
+    half_amp = amp / 2
+    wf = offset + half_amp * np.sin(2 * np.pi * freq * time)
+    return time, wf
 
 
-def generate_square_wave(
-    frequency: float,
-    amplitude: float,
+def gen_square_wf(
+    freq: float,
+    amp: float,
     duty_cycle: float,
-    duration: float = 1.0,
+    offset: float = 0.0,
+    dur: float = 1.0,
     sample_rate: int = 1000
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate a square wave.
+    Generate a square waveform with configurable y-axis offset.
 
     Args:
-        frequency: Frequency in Hz (1.0-100.0)
-        amplitude: Amplitude (0.0-10.0)
+        freq: Frequency in Hz (0.1-100.0)
+        amp: Amplitude (0.0-10.0), waveform ranges from offset to offset+amp
         duty_cycle: Duty cycle percentage (1.0-100.0)
-        duration: Duration in seconds
+        offset: Y-axis offset (0.0-10.0)
+        dur: Duration in seconds
         sample_rate: Samples per second
 
     Returns:
         Tuple of (time array, amplitude array)
     """
-    time = np.linspace(0, duration, int(sample_rate * duration))
-    wave = amplitude * signal.square(
-        2 * np.pi * frequency * time,
+    time = np.linspace(0, dur, int(sample_rate * dur))
+    half_amp = amp / 2
+    wf = offset + half_amp * signal.square(
+        2 * np.pi * freq * time,
         duty=duty_cycle / 100
     )
-    return time, wave
+    return time, wf
 
 
-def generate_sawtooth_wave(
-    frequency: float,
-    amplitude: float,
-    duration: float = 1.0,
+def gen_sawtooth_wf(
+    freq: float,
+    amp: float,
+    offset: float = 0.0,
+    dur: float = 1.0,
     sample_rate: int = 1000
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate a sawtooth wave.
+    Generate a sawtooth waveform with configurable y-axis offset.
 
     Args:
-        frequency: Frequency in Hz (1.0-100.0)
-        amplitude: Amplitude (0.0-10.0)
-        duration: Duration in seconds
+        freq: Frequency in Hz (0.1-100.0)
+        amp: Amplitude (0.0-10.0), waveform ranges from offset to offset+amp
+        offset: Y-axis offset (0.0-10.0)
+        dur: Duration in seconds
         sample_rate: Samples per second
 
     Returns:
         Tuple of (time array, amplitude array)
     """
-    time = np.linspace(0, duration, int(sample_rate * duration))
-    wave = amplitude * signal.sawtooth(2 * np.pi * frequency * time)
-    return time, wave
+    time = np.linspace(0, dur, int(sample_rate * dur))
+    half_amp = amp / 2
+    wf = offset + half_amp * signal.sawtooth(2 * np.pi * freq * time)
+    return time, wf
 
 
-def generate_triangle_wave(
-    frequency: float,
-    amplitude: float,
-    duration: float = 1.0,
+def gen_triangle_wf(
+    freq: float,
+    amp: float,
+    offset: float = 0.0,
+    dur: float = 1.0,
     sample_rate: int = 1000
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate a triangle wave.
+    Generate a triangle waveform with configurable y-axis offset.
 
     Args:
-        frequency: Frequency in Hz (1.0-100.0)
-        amplitude: Amplitude (0.0-10.0)
-        duration: Duration in seconds
+        freq: Frequency in Hz (0.1-100.0)
+        amp: Amplitude (0.0-10.0), waveform ranges from offset to offset+amp
+        offset: Y-axis offset (0.0-10.0)
+        dur: Duration in seconds
         sample_rate: Samples per second
 
     Returns:
         Tuple of (time array, amplitude array)
     """
-    time = np.linspace(0, duration, int(sample_rate * duration))
-    wave = amplitude * signal.sawtooth(
-        2 * np.pi * frequency * time,
+    time = np.linspace(0, dur, int(sample_rate * dur))
+    half_amp = amp / 2
+    wf = offset + half_amp * signal.sawtooth(
+        2 * np.pi * freq * time,
         width=0.5
     )
-    return time, wave
+    return time, wf
 
 
-def compute_max_envelope(
-    waveforms: List[Tuple[np.ndarray, np.ndarray]]
+def compute_max_env(
+    wfs: List[Tuple[np.ndarray, np.ndarray]]
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute maximum envelope from multiple waveforms.
 
     Args:
-        waveforms: List of (time, amplitude) tuples
+        wfs: List of (time, amplitude) tuples
 
     Returns:
         Tuple of (time array, max envelope array)
     """
-    if not waveforms:
+    if not wfs:
         return np.array([]), np.array([])
 
-    time = waveforms[0][0]  # Shared time base
-    amplitudes = np.array([w[1] for w in waveforms])
-    max_env = np.max(amplitudes, axis=0)
+    time = wfs[0][0]  # Shared time base
+    amps = np.array([w[1] for w in wfs])
+    max_env = np.max(amps, axis=0)
 
     return time, max_env
 
 
-def compute_min_envelope(
-    waveforms: List[Tuple[np.ndarray, np.ndarray]]
+def compute_min_env(
+    wfs: List[Tuple[np.ndarray, np.ndarray]]
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Compute minimum envelope from multiple waveforms.
 
     Args:
-        waveforms: List of (time, amplitude) tuples
+        wfs: List of (time, amplitude) tuples
 
     Returns:
         Tuple of (time array, min envelope array)
     """
-    if not waveforms:
+    if not wfs:
         return np.array([]), np.array([])
 
-    time = waveforms[0][0]  # Shared time base
-    amplitudes = np.array([w[1] for w in waveforms])
-    min_env = np.min(amplitudes, axis=0)
+    time = wfs[0][0]  # Shared time base
+    amps = np.array([w[1] for w in wfs])
+    min_env = np.min(amps, axis=0)
 
     return time, min_env
 
 
-def generate_waveform(
-    wave_type: str,
-    frequency: float,
-    amplitude: float,
+def gen_wf(
+    wf_type: str,
+    freq: float,
+    amp: float,
+    offset: float = 0.0,
     duty_cycle: float = 50.0,
-    duration: float = 1.0,
+    dur: float = 1.0,
     sample_rate: int = 1000
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate a waveform based on type.
 
     Args:
-        wave_type: Type of waveform (sine, square, sawtooth, triangle)
-        frequency: Frequency in Hz (1.0-100.0)
-        amplitude: Amplitude (0.0-10.0)
+        wf_type: Type of waveform (sine, square, sawtooth, triangle)
+        freq: Frequency in Hz (0.1-100.0)
+        amp: Amplitude (0.0-10.0)
+        offset: Y-axis offset (0.0-10.0)
         duty_cycle: Duty cycle percentage (1.0-100.0, for square only)
-        duration: Duration in seconds
+        dur: Duration in seconds
         sample_rate: Samples per second
 
     Returns:
         Tuple of (time array, amplitude array)
     """
-    wave_type = wave_type.lower()
+    wf_type = wf_type.lower()
 
-    if wave_type == "sine":
-        return generate_sine_wave(frequency, amplitude, duration, sample_rate)
-    elif wave_type == "square":
-        return generate_square_wave(frequency, amplitude, duty_cycle, duration, sample_rate)
-    elif wave_type == "sawtooth":
-        return generate_sawtooth_wave(frequency, amplitude, duration, sample_rate)
-    elif wave_type == "triangle":
-        return generate_triangle_wave(frequency, amplitude, duration, sample_rate)
+    if wf_type == "sine":
+        return gen_sine_wf(freq, amp, offset, dur, sample_rate)
+    elif wf_type == "square":
+        return gen_square_wf(freq, amp, duty_cycle, offset, dur, sample_rate)
+    elif wf_type == "sawtooth":
+        return gen_sawtooth_wf(freq, amp, offset, dur, sample_rate)
+    elif wf_type == "triangle":
+        return gen_triangle_wf(freq, amp, offset, dur, sample_rate)
     else:
-        # Default to sine wave
-        return generate_sine_wave(frequency, amplitude, duration, sample_rate)
+        # Default to sine waveform
+        return gen_sine_wf(freq, amp, offset, dur, sample_rate)
