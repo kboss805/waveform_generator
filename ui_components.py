@@ -4,6 +4,8 @@ UI components for the Real-Time Waveform Visualizer.
 This module contains all CustomTkinter UI creation and callback logic.
 """
 
+import os
+import sys
 import customtkinter as ctk
 from tkinter import filedialog
 import matplotlib.pyplot as plt
@@ -43,6 +45,9 @@ class WaveformApp(ctk.CTk):
         self.geometry("1200x900")
         self.minsize(1000, 800)
 
+        # Set window icon
+        self._set_icon()
+
         # Configure grid weights
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -63,6 +68,19 @@ class WaveformApp(ctk.CTk):
         self._update_env_controls()
         self._update_add_button()
         self._update_all_plots()
+
+    def _set_icon(self):
+        """Set the window icon if available."""
+        # Determine base path (handles PyInstaller bundled app)
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        icon_path = os.path.join(base_path, "icon.ico")
+
+        if os.path.exists(icon_path):
+            self.iconbitmap(icon_path)
 
     def _create_sidebar(self):
         """Create the sidebar with all controls."""

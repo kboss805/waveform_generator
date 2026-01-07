@@ -62,6 +62,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 
 **Acceptance Criteria:**
 - ✅ Display all plots updating in real-time
+- ✅ Include standard view controls like pan and zoom
 - ✅ Smooth updates (>30 FPS)
 - ✅ All plots update within 100ms of parameter change
 
