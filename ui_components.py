@@ -261,19 +261,6 @@ class WaveformApp(ctk.CTk):
         self.show_min_env_label = ctk.CTkLabel(min_env_frame, text="Show Min Envelope")
         self.show_min_env_label.pack(side="left")
 
-        # Hide Source Waveforms checkbox
-        hide_src_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        hide_src_frame.pack(fill="x", pady=(2, 10))
-        self.hide_src_var = ctk.BooleanVar(value=False)
-        self.hide_src_cb = ctk.CTkCheckBox(
-            hide_src_frame, text="",
-            variable=self.hide_src_var,
-            command=self._on_hide_src_changed,
-            width=24
-        )
-        self.hide_src_cb.pack(side="left")
-        self.hide_src_label = ctk.CTkLabel(hide_src_frame, text="Hide Source Waveforms")
-        self.hide_src_label.pack(side="left")
 
         # === Export ===
         self._add_section_header("Export")
@@ -377,20 +364,22 @@ class WaveformApp(ctk.CTk):
     def _on_max_env_changed(self):
         """Handle max envelope toggle."""
         app_state.show_max_env = self.show_max_env_var.get()
+        self._auto_hide_source_waveforms()
         self._update_env_controls()
         self._update_all_plots()
 
     def _on_min_env_changed(self):
         """Handle min envelope toggle."""
         app_state.show_min_env = self.show_min_env_var.get()
+        self._auto_hide_source_waveforms()
         self._update_env_controls()
         self._update_all_plots()
 
-    def _on_hide_src_changed(self):
-        """Handle hide source waveforms toggle."""
-        app_state.hide_src_wfs = self.hide_src_var.get()
+    def _auto_hide_source_waveforms(self):
+        """Automatically hide/show source waveforms based on envelope state."""
+        any_envelope_shown = app_state.show_max_env or app_state.show_min_env
+        app_state.hide_src_wfs = any_envelope_shown
         self._update_wf_management_controls()
-        self._update_all_plots()
 
     def _on_add_wf(self):
         """Add a new waveform."""
@@ -685,17 +674,15 @@ class WaveformApp(ctk.CTk):
                     label = f"Waveform {wf.id + 1}"
                     self.ax.plot(time, amp, color=color, label=label, linewidth=2)
 
-        # Plot envelopes
+        # Plot envelopes with glow effect
         if app_state.can_show_envelopes() and wf_data:
             if app_state.show_max_env:
                 time, max_env = compute_max_env(wf_data)
-                self.ax.plot(time, max_env, color='darkblue', label='Max Envelope',
-                           linewidth=2, linestyle='--')
+                self._plot_glowing_line(time, max_env, '#00FF00', 'Max Envelope')
 
             if app_state.show_min_env:
                 time, min_env = compute_min_env(wf_data)
-                self.ax.plot(time, min_env, color='red', label='Min Envelope',
-                           linewidth=2, linestyle='--')
+                self._plot_glowing_line(time, min_env, '#FF0000', 'Min Envelope')
 
         # Add legend if there are any lines
         if self.ax.get_lines():
@@ -706,6 +693,15 @@ class WaveformApp(ctk.CTk):
 
         # Update status bar
         self._update_status_bar()
+
+    def _plot_glowing_line(self, x, y, color: str, label: str):
+        """Plot a line with a glow effect."""
+        # Outer glow layers (wider, more transparent)
+        self.ax.plot(x, y, color=color, linewidth=8, alpha=0.1)
+        self.ax.plot(x, y, color=color, linewidth=6, alpha=0.2)
+        self.ax.plot(x, y, color=color, linewidth=4, alpha=0.3)
+        # Core line (solid, with label for legend)
+        self.ax.plot(x, y, color=color, linewidth=2, alpha=1.0, label=label)
 
     def _update_wf_list(self):
         """Update the waveform list UI."""
@@ -865,23 +861,10 @@ class WaveformApp(ctk.CTk):
             text_color=ENABLED_TEXT_COLOR if can_show else DISABLED_TEXT_COLOR
         )
 
-        # Hide source checkbox requires at least one envelope to be shown
-        can_hide_src = can_show and (app_state.show_max_env or app_state.show_min_env)
-        self.hide_src_cb.configure(state="normal" if can_hide_src else "disabled")
-        self.hide_src_label.configure(
-            text_color=ENABLED_TEXT_COLOR if can_hide_src else DISABLED_TEXT_COLOR
-        )
-
-        # If hide source becomes disabled, turn it off
-        if not can_hide_src:
-            if app_state.hide_src_wfs:
-                app_state.hide_src_wfs = False
-                self._update_wf_management_controls()
-            self.hide_src_var.set(False)
-
         if not can_show:
             app_state.show_max_env = False
             app_state.show_min_env = False
+            app_state.hide_src_wfs = False
             self.show_max_env_var.set(False)
             self.show_min_env_var.set(False)
 
