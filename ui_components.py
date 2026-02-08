@@ -7,6 +7,7 @@ This module contains all CustomTkinter UI creation and callback logic.
 import os
 import sys
 from typing import Any
+import numpy as np
 import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, Menu, Toplevel, Label
@@ -25,7 +26,7 @@ from app_state import (
     DUTY_MIN, DUTY_MAX, DUTY_STEP
 )
 from config import load_config, save_config
-from waveform_generator import gen_wf, compute_max_env, compute_min_env
+from waveform_generator import gen_wf, compute_max_env, compute_min_env, compute_rms_env
 from data_export import export_to_csv, prep_wf_for_export
 
 
@@ -34,7 +35,7 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 # Application version
-APP_VERSION = "0.9.1"
+APP_VERSION = "1.1.0"
 
 # Color constants
 SECTION_HEADER_COLOR = "#FFFF00"  # Yellow
@@ -53,6 +54,8 @@ COLOR_WF_OFF = "#646464"
 COLOR_REMOVE_BTN = "#8B0000"
 COLOR_SUCCESS = "#00FF00"
 COLOR_ERROR = "#FF0000"
+COLOR_RMS = "#FFA500"
+COLOR_P2P_FILL = "#00FFFF"
 
 
 class WaveformApp(ctk.CTk):
@@ -95,6 +98,10 @@ class WaveformApp(ctk.CTk):
         self._create_sidebar()
         self._create_plot_area()
         self._create_status_bar()
+
+        # Connect cursor events (always on)
+        self.canvas.mpl_connect('motion_notify_event', self._on_mouse_move)
+        self.canvas.mpl_connect('button_press_event', self._on_plot_click)
 
         # Initialize UI state
         self._update_wf_list()
@@ -526,6 +533,28 @@ class WaveformApp(ctk.CTk):
         self.show_min_env_label = ctk.CTkLabel(min_env_frame, text="Show Min Envelope")
         self.show_min_env_label.pack(side="left")
 
+        # RMS Envelope checkbox
+        rms_env_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        rms_env_frame.pack(fill="x", pady=2)
+        self.show_rms_env_var = ctk.BooleanVar(value=False)
+        self.show_rms_env_cb = ctk.CTkCheckBox(
+            rms_env_frame, text="",
+            variable=self.show_rms_env_var,
+            command=self._on_rms_env_changed,
+            width=24
+        )
+        self.show_rms_env_cb.pack(side="left")
+        self.show_rms_env_label = ctk.CTkLabel(rms_env_frame, text="Show RMS Envelope")
+        self.show_rms_env_label.pack(side="left")
+
+        # Live cursor state: tracks mouse, click pins a reference
+        self._live_cursor_x: float | None = None
+        self._live_cursor_y: float | None = None
+        self._live_cursor_vline: Any = None
+        self._pinned_cursor_x: float | None = None
+        self._pinned_cursor_vline: Any = None
+        self._highlight_marker: Any = None  # scatter dot on nearest waveform
+        self._highlighted_wf_name: str | None = None  # name of nearest wf
 
         # === Export ===
         self._add_section_header("Export")
@@ -715,9 +744,20 @@ class WaveformApp(ctk.CTk):
         self._update_env_controls()
         self._update_all_plots()
 
+    def _on_rms_env_changed(self):
+        """Handle RMS envelope toggle."""
+        app_state.show_rms_env = self.show_rms_env_var.get()
+        self._auto_hide_source_waveforms()
+        self._update_env_controls()
+        self._update_all_plots()
+
     def _auto_hide_source_waveforms(self):
         """Automatically hide/show source waveforms based on envelope state."""
-        any_envelope_shown = app_state.show_max_env or app_state.show_min_env
+        any_envelope_shown = (
+            app_state.show_max_env
+            or app_state.show_min_env
+            or app_state.show_rms_env
+        )
         app_state.hide_src_wfs = any_envelope_shown
         self._update_wf_management_controls()
 
@@ -964,6 +1004,10 @@ class WaveformApp(ctk.CTk):
                 time, min_env = compute_min_env(wf_arrays)
                 envs_to_export.append(("Min_Envelope", time, min_env))
 
+            if app_state.show_rms_env:
+                time, rms_env = compute_rms_env(wf_arrays)
+                envs_to_export.append(("RMS_Envelope", time, rms_env))
+
         # Export
         success, message = export_to_csv(
             filename,
@@ -1018,17 +1062,42 @@ class WaveformApp(ctk.CTk):
 
         # Plot envelopes with glow effect
         if app_state.can_show_envelopes() and wf_data:
+            max_env_data = None
+            min_env_data = None
+
             if app_state.show_max_env:
-                time, max_env = compute_max_env(wf_data)
-                self._plot_glowing_line(time, max_env, COLOR_SUCCESS, 'Max Envelope')
+                max_env_data = compute_max_env(wf_data)
+                self._plot_glowing_line(
+                    max_env_data[0], max_env_data[1],
+                    COLOR_SUCCESS, 'Max Envelope'
+                )
 
             if app_state.show_min_env:
-                time, min_env = compute_min_env(wf_data)
-                self._plot_glowing_line(time, min_env, COLOR_ERROR, 'Min Envelope')
+                min_env_data = compute_min_env(wf_data)
+                self._plot_glowing_line(
+                    min_env_data[0], min_env_data[1],
+                    COLOR_ERROR, 'Min Envelope'
+                )
+
+            # Peak-to-Peak fill between max and min
+            if max_env_data is not None and min_env_data is not None:
+                self.ax.fill_between(
+                    max_env_data[0], min_env_data[1], max_env_data[1],
+                    alpha=0.12, color=COLOR_P2P_FILL, label="Peak-to-Peak"
+                )
+
+            if app_state.show_rms_env:
+                time_rms, rms_env = compute_rms_env(wf_data)
+                self._plot_glowing_line(
+                    time_rms, rms_env, COLOR_RMS, 'RMS Envelope'
+                )
 
         # Add legend if there are any lines
         if self.ax.get_lines():
             self.ax.legend(loc='upper right')
+
+        # Redraw cursors (ax.clear removes them)
+        self._redraw_cursors()
 
         # Redraw canvas
         self.canvas.draw()
@@ -1213,12 +1282,20 @@ class WaveformApp(ctk.CTk):
             text_color=ENABLED_TEXT_COLOR if can_show else DISABLED_TEXT_COLOR
         )
 
+        # Update RMS envelope checkbox
+        self.show_rms_env_cb.configure(state="normal" if can_show else "disabled")
+        self.show_rms_env_label.configure(
+            text_color=ENABLED_TEXT_COLOR if can_show else DISABLED_TEXT_COLOR
+        )
+
         if not can_show:
             app_state.show_max_env = False
             app_state.show_min_env = False
+            app_state.show_rms_env = False
             app_state.hide_src_wfs = False
             self.show_max_env_var.set(False)
             self.show_min_env_var.set(False)
+            self.show_rms_env_var.set(False)
 
     def _update_add_button(self):
         """Enable/disable add waveform button based on max limit and hide_src state."""
@@ -1229,6 +1306,173 @@ class WaveformApp(ctk.CTk):
         """Enable/disable waveform management controls based on hide_src state."""
         self._update_add_button()
         self._update_wf_list()
+
+    # === Cursor Methods ===
+
+    def _on_mouse_move(self, event: Any):
+        """Handle mouse movement over the plot for live cursor tracking."""
+        if event.inaxes != self.ax:
+            # Remove live cursor when mouse leaves plot
+            if self._live_cursor_vline and self._live_cursor_vline in self.ax.lines:
+                self._live_cursor_vline.remove()
+                self._live_cursor_vline = None
+            self._remove_highlight_marker()
+            self._live_cursor_x = None
+            self._live_cursor_y = None
+            self._highlighted_wf_name = None
+            self.canvas.draw_idle()
+            return
+
+        self._live_cursor_x = event.xdata
+        self._live_cursor_y = event.ydata
+
+        # Find nearest waveform for highlight
+        nearest = self._find_nearest_wf(event.xdata, event.ydata)
+        cursor_color = '#FFFFFF'
+        cursor_alpha = 0.5
+        cursor_width = 1
+
+        if nearest is not None:
+            wf_name, wf_y, wf_color = nearest
+            self._highlighted_wf_name = wf_name
+            cursor_color = wf_color
+            cursor_alpha = 0.8
+            cursor_width = 1.5
+            # Update or create highlight marker dot
+            self._remove_highlight_marker()
+            self._highlight_marker = self.ax.plot(
+                event.xdata, wf_y, 'o',
+                color=wf_color, markersize=8,
+                markeredgecolor='white', markeredgewidth=1.5,
+                zorder=10
+            )[0]
+        else:
+            self._highlighted_wf_name = None
+            self._remove_highlight_marker()
+
+        # Update or create live cursor line
+        if self._live_cursor_vline and self._live_cursor_vline in self.ax.lines:
+            self._live_cursor_vline.set_xdata([event.xdata, event.xdata])
+            self._live_cursor_vline.set_color(cursor_color)
+            self._live_cursor_vline.set_alpha(cursor_alpha)
+            self._live_cursor_vline.set_linewidth(cursor_width)
+        else:
+            self._live_cursor_vline = self.ax.axvline(
+                event.xdata, color=cursor_color,
+                linestyle='-', linewidth=cursor_width, alpha=cursor_alpha
+            )
+
+        self.canvas.draw_idle()
+
+    def _find_nearest_wf(
+        self, x: float, y: float
+    ) -> tuple[str, float, str] | None:
+        """Find the nearest visible line to the mouse position.
+
+        Checks envelope lines when visible, individual waveforms otherwise.
+        Returns (name, y_value, color_hex) or None if nothing is close.
+        """
+        y_min, y_max = self.ax.get_ylim()
+        threshold = (y_max - y_min) * 0.04  # 4% of visible Y range
+
+        best_dist = threshold
+        best_result = None
+
+        # Collect enabled waveform data (needed for both modes)
+        wf_data = []
+        for wf in app_state.wfs:
+            if wf.enabled:
+                wf_data.append(gen_wf(
+                    wf.wf_type, wf.freq, wf.amp, wf.offset,
+                    wf.duty_cycle, app_state.duration,
+                    app_state.sample_rate
+                ))
+
+        # Check envelope lines when they're visible
+        if app_state.can_show_envelopes() and wf_data:
+            env_candidates: list[tuple[str, float, str]] = []
+
+            if app_state.show_max_env:
+                _, max_env = compute_max_env(wf_data)
+                env_y = float(np.interp(x, wf_data[0][0], max_env))
+                env_candidates.append(("Max Envelope", env_y, COLOR_SUCCESS))
+
+            if app_state.show_min_env:
+                _, min_env = compute_min_env(wf_data)
+                env_y = float(np.interp(x, wf_data[0][0], min_env))
+                env_candidates.append(("Min Envelope", env_y, COLOR_ERROR))
+
+            if app_state.show_rms_env:
+                _, rms_env = compute_rms_env(wf_data)
+                env_y = float(np.interp(x, wf_data[0][0], rms_env))
+                env_candidates.append(("RMS Envelope", env_y, COLOR_RMS))
+
+            for name, env_y, color in env_candidates:
+                dist = abs(y - env_y)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_result = (name, env_y, color)
+
+        # Check individual waveforms when they're visible
+        if not app_state.hide_src_wfs:
+            for wf, (time, amp) in zip(
+                [w for w in app_state.wfs if w.enabled], wf_data
+            ):
+                wf_y = float(np.interp(x, time, amp))
+                dist = abs(y - wf_y)
+                if dist < best_dist:
+                    best_dist = dist
+                    color_hex = '#{:02x}{:02x}{:02x}'.format(*wf.color)
+                    best_result = (wf.display_name, wf_y, color_hex)
+
+        return best_result
+
+    def _remove_highlight_marker(self):
+        """Remove the highlight dot from the plot."""
+        if self._highlight_marker is not None:
+            try:
+                self._highlight_marker.remove()
+            except ValueError:
+                pass
+            self._highlight_marker = None
+
+    def _on_plot_click(self, event: Any):
+        """Handle click on the plot to pin a reference cursor."""
+        if event.inaxes != self.ax:
+            return
+        if event.button != 1:
+            return
+
+        # Remove old pinned cursor line
+        if self._pinned_cursor_vline and self._pinned_cursor_vline in self.ax.lines:
+            self._pinned_cursor_vline.remove()
+
+        # Pin a reference cursor at click position
+        self._pinned_cursor_x = event.xdata
+        self._pinned_cursor_vline = self.ax.axvline(
+            event.xdata, color='#AAAAAA',
+            linestyle='--', linewidth=1, alpha=0.7
+        )
+
+        self.canvas.draw_idle()
+
+    def _redraw_cursors(self):
+        """Re-draw cursor lines after ax.clear() and update readout."""
+        # ax.clear() already removed these, reset references
+        self._highlight_marker = None
+
+        # Redraw pinned cursor
+        if self._pinned_cursor_x is not None:
+            self._pinned_cursor_vline = self.ax.axvline(
+                self._pinned_cursor_x, color='#AAAAAA',
+                linestyle='--', linewidth=1, alpha=0.7
+            )
+        # Redraw live cursor (highlight recalculated on next mouse move)
+        if self._live_cursor_x is not None:
+            self._live_cursor_vline = self.ax.axvline(
+                self._live_cursor_x, color='#FFFFFF',
+                linestyle='-', linewidth=1, alpha=0.5
+            )
 
     def _update_status_bar(self):
         """Update status bar with current info."""

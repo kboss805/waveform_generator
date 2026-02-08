@@ -109,6 +109,7 @@ class AppState:
         self.active_wf_index: int = 0
         self.show_max_env: bool = False
         self.show_min_env: bool = False
+        self.show_rms_env: bool = False
         self.hide_src_wfs: bool = False
 
         # Initialize with one default waveform

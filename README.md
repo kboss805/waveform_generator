@@ -57,8 +57,18 @@ When you have 2 or more **enabled** waveforms:
 
 - **Show Max Envelope** - Displays the maximum amplitude at each time point (green glowing line)
 - **Show Min Envelope** - Displays the minimum amplitude at each time point (red glowing line)
+- **Show RMS Envelope** - Displays the root-mean-square across all enabled waveforms (orange glowing line)
+- **Peak-to-Peak Fill** - When both Max and Min envelopes are enabled, a cyan shaded region fills the area between them
 
-Both envelopes can be enabled simultaneously. Source waveforms are automatically hidden when envelopes are shown.
+All envelopes can be enabled simultaneously. Source waveforms are automatically hidden when envelopes are shown.
+
+### Measurement Cursors
+
+1. Click **Cursors: OFF** in the Measurement section to enable cursor mode
+2. **Move the mouse** over the plot — a live cursor line tracks the mouse position and the readout continuously updates with time and amplitude values for each enabled waveform
+3. **Left-click** on the plot to pin a reference cursor (dashed line)
+4. With a pinned cursor and the live cursor, the time difference (ΔT) between them is displayed
+5. Click **Clear Pin** to remove the pinned reference cursor
 
 ### Waveform Parameters
 
@@ -99,7 +109,8 @@ Default settings are stored in `default.cfg` (INI format) alongside the applicat
 - **Up to 5 simultaneous waveforms**
 - **Custom waveform naming** via right-click context menu
 - **Real-time visualization** with responsive performance
-- **Envelope analysis** with glowing Max/Min envelope lines
+- **Envelope analysis** with glowing Max/Min/RMS envelope lines and Peak-to-Peak fill
+- **Live measurement cursors** with real-time tracking, pinned reference, and ΔT display
 - **Auto-hide source waveforms** when envelopes are enabled
 - **CSV export** with native OS file dialog (includes custom names)
 - **Independent waveform control**
@@ -170,6 +181,6 @@ waveform_analyzer/
 
 ## Version
 
-Current version: **0.9.1**
+Current version: **1.1.0**
 
 See [CLAUDE.md](CLAUDE.md) for the complete specification and future roadmap.

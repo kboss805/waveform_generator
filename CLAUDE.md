@@ -1,6 +1,6 @@
 # Waveform Analyzer
 
-**Version:** 0.9.1
+**Version:** 1.1.0
 **Target Users:** Engineers visualizing up to 5 independent waveforms with envelope analysis  
 **Tech Stack:** Python 3.11+, NumPy 1.24+, SciPy 1.11+, CustomTkinter 5.2+, matplotlib 3.8+
 
@@ -115,7 +115,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 
 ---
 
-## Current Feature Set (v1.0)
+## Current Feature Set (v1.1)
 
 ### Supported Waveforms
 | Type | Required Parameters | Optional Parameters |
@@ -130,9 +130,20 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ### Envelope Analysis
 - **Max Envelope:** Green (#00FF00) glowing line - highest amplitude at each time sample
 - **Min Envelope:** Red (#FF0000) glowing line - lowest amplitude at each time sample
+- **RMS Envelope:** Orange (#FFA500) glowing line - root-mean-square across all enabled waveforms
+- **Peak-to-Peak Fill:** Cyan (#00FFFF) shaded region between max and min envelopes (appears automatically when both are enabled)
 - **Glow Effect:** Layered lines (8px/6px/4px at 0.1/0.2/0.3 alpha + 2px core at full alpha)
 - **Auto-hide:** Source waveforms are automatically hidden when any envelope is enabled
 - **Behavior:** Disabled when ≤1 waveform, calculates from enabled waveforms only, real-time updates
+
+### Measurement Cursors
+- **Toggle:** "Cursors: ON/OFF" button in Measurement sidebar section
+- **Live Tracking:** When enabled, a white cursor line follows the mouse and readout updates continuously
+- **Pin Reference:** Left-click on plot to pin a dashed reference cursor for comparison
+- **Readout:** Shows time and interpolated amplitude for each enabled waveform at cursor positions (Pin + Cur labels)
+- **Delta:** When both pinned and live cursors present, shows ΔT between them
+- **Clear Pin:** "Clear Pin" button removes the pinned reference cursor
+- **Persistence:** Pinned cursor survives parameter changes (re-drawn after plot update)
 
 ### Waveform Renaming
 - **Right-click** any waveform button to open context menu with "Rename..." option
@@ -183,6 +194,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
     "active_waveform_index": int,    # Which waveform controls are shown
     "show_max_envelope": bool,       # MaxEnvelope visibility
     "show_min_envelope": bool,       # MinEnvelope visibility
+    "show_rms_envelope": bool,       # RMS Envelope visibility
     "hide_src_wfs": bool             # Auto-set when envelopes enabled
 }
 ```
@@ -215,7 +227,11 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 │ Duty Cycle: (hidden for Sine)│
 ├─ Advanced ───────────────────┤
 │ ☐ Show Max Envelope          │  ← Disabled when ≤1 waveform
-│ ☐ Show Min Envelope          │  ← Source waveforms auto-hide when enabled
+│ ☐ Show Min Envelope          │  ← Peak-to-Peak fill when both on
+│ ☐ Show RMS Envelope          │  ← Orange glow line
+├─ Measurement ────────────────┤
+│ [Cursors: OFF] [Clear Pin]   │  ← Toggle + clear pinned cursor
+│ Cursor readout text          │  ← Live T/Y values, pin, ΔT
 ├─ Export ─────────────────────┤
 │ [Export to CSV]              │  ← Opens native OS file dialog
 │ Status: Ready                │
@@ -238,6 +254,9 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 | 5 | Orange | (255, 165, 0) |
 | MaxEnvelope | Green (glow) | #00FF00 |
 | MinEnvelope | Red (glow) | #FF0000 |
+| RMSEnvelope | Orange (glow) | #FFA500 |
+| Peak-to-Peak | Cyan (fill) | #00FFFF @ 12% alpha |
+| Cursors | Gray (dashed) | #AAAAAA @ 70% alpha |
 
 ### Plot Styling
 - Background: #1a1a1a, Axes: #666666, Grid: #666666 @ 20% opacity
@@ -389,9 +408,9 @@ Note: Custom waveform names (via rename) are used for column headers. Spaces rep
 ## Future Feature Roadmap
 
 ### v1.1 - Enhanced Analysis
-- [ ] **Peak-to-Peak Envelope:** Shaded area between max/min
-- [ ] **RMS Envelope:** Root-mean-square calculation
-- [ ] **Measurement Cursors:** Click to see exact X/Y values
+- ✅ **Peak-to-Peak Envelope:** Cyan shaded area between max/min (auto when both enabled)
+- ✅ **RMS Envelope:** Orange glowing line, RMS across enabled waveforms
+- ✅ **Measurement Cursors:** Live tracking cursor with pinned reference and ΔT
 
 ### v1.2 - Composite Operations
 - [ ] **Arithmetic Operations:** Add, subtract, multiply, divide waveforms

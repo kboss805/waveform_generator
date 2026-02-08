@@ -166,6 +166,28 @@ def compute_min_env(
     return time, min_env
 
 
+def compute_rms_env(
+    wfs: List[Tuple[np.ndarray, np.ndarray]]
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Compute RMS envelope from multiple waveforms.
+
+    Args:
+        wfs: List of (time, amplitude) tuples
+
+    Returns:
+        Tuple of (time array, RMS envelope array)
+    """
+    if not wfs:
+        return np.array([]), np.array([])
+
+    time = wfs[0][0]  # Shared time base
+    amps = np.array([w[1] for w in wfs])
+    rms_env = np.sqrt(np.mean(amps ** 2, axis=0))
+
+    return time, rms_env
+
+
 def gen_wf(
     wf_type: str,
     freq: float,
