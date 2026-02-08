@@ -1,6 +1,6 @@
 # Waveform Analyzer
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Target Users:** Engineers visualizing up to 5 independent waveforms with envelope analysis  
 **Tech Stack:** Python 3.11+, NumPy 1.24+, SciPy 1.11+, CustomTkinter 5.2+, CTkMenuBar 0.9+, matplotlib 3.8+
 
@@ -67,7 +67,7 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 
 ---
 
-## Current Feature Set (v1.1)
+## Current Feature Set (v1.2)
 
 ### Supported Waveforms
 | Type | Required Parameters | Optional Parameters |
@@ -96,12 +96,13 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 - **Persistence:** Pinned cursor survives parameter changes (re-drawn after plot update)
 - **No Sidebar Controls:** All cursor feedback is displayed directly on the plot
 
-### Waveform Renaming
-- **Right-click** any waveform button to open context menu with "Rename..." option
-- **Tooltip** on hover: "Right-click to change waveform name"
+### Waveform Renaming & Color Customization
+- **Right-click** any waveform button to open context menu with "Rename..." and "Change Color..." options
+- **Tooltip** on hover: "Right-click to rename or change color"
 - Custom names propagate to plot legend and CSV export
 - Duplicate names are rejected with a re-prompt
 - Empty name reverts to default ("Waveform N")
+- **Change Color...** opens a system color chooser; custom colors survive waveform removal
 
 ### Configuration
 - **File:** `default.cfg` (INI format) stored alongside the application or executable
@@ -109,13 +110,22 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 - **Sections:**
   - **Global** — `duration` (wave duration in seconds)
   - **Waveform Defaults** — `type`, `frequency`, `amplitude`, `offset`, `duty_cycle` (applied on next launch)
-  - **Display** — `y_axis_title`, `y_min`, `y_max` (applied immediately on save)
+  - **Display** — `y_axis_title`, `y_min`, `y_max`, `theme` (applied immediately on save)
 - **Behavior:** Display settings update the live plot instantly; waveform defaults are read at `app_state` import time
 - **PyInstaller:** Config path resolves to the directory of the executable when frozen
 
+### Theme Toggle
+- **Access:** File → Toggle Theme
+- **Modes:** Dark (default) and Light
+- **Scope:** Switches CustomTkinter appearance mode, matplotlib plot style, menu bar, and all UI colors
+- **Persistence:** Theme choice stored in `default.cfg` under `[display] theme = dark|light`
+- **Implementation:** Two theme dicts (`DARK_THEME` / `LIGHT_THEME`) in `ui_components.py`; `_theme` module-level reference swapped on toggle
+
 ### Export Capability
-- **Format:** CSV with time column + amplitude columns
-- **Metadata:** Timestamp, waveform parameters, sample rate, duration
+- **Formats:** CSV, MATLAB .mat, JSON (selected via file dialog extension filter)
+- **CSV:** Time + amplitude columns with metadata header comments
+- **MATLAB .mat:** Named variables per waveform/envelope, metadata struct (via `scipy.io.savemat`)
+- **JSON:** Structured document with time array, waveform objects (params + data), envelope objects
 - **Scope:** Exports all enabled waveforms and active envelopes
 
 ---
@@ -161,7 +171,7 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 
 ### Layout (1200x900 default, 1000x800 minimum, Dark Theme #1a1a1a)
 
-**Menu Bar:** File > Configure..., Help > About... (CTkMenuBar, fully dark-themed)
+**Menu Bar:** File > Configure... | Toggle Theme, Help > About... (CTkMenuBar, themed)
 
 **Sidebar (330px, scrollable):**
 ```
@@ -192,18 +202,18 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 
 **About Dialog:** App name, version (APP_VERSION constant), description, author info
 
-### Color Palette (Auto-assigned)
+### Color Palette (Auto-assigned, User-customizable via Right-Click)
 | Waveform | Color | RGB |
 |----------|-------|-----|
-| 1 | Yellow | (255, 255, 0) |
-| 2 | Cyan | (0, 255, 255) |
-| 3 | Magenta | (255, 0, 255) |
-| 4 | Green | (0, 255, 0) |
-| 5 | Orange | (255, 165, 0) |
-| MaxEnvelope | Green (glow) | #00FF00 |
-| MinEnvelope | Red (glow) | #FF0000 |
-| RMSEnvelope | Orange (glow) | #FFA500 |
-| Peak-to-Peak | Cyan (fill) | #00FFFF @ 12% alpha |
+| 1 | Pink 300 | (240, 98, 146) |
+| 2 | Light Blue 300 | (79, 195, 247) |
+| 3 | Amber 500 | (255, 193, 7) |
+| 4 | Lime 500 | (205, 220, 57) |
+| 5 | Deep Purple 200 | (179, 157, 219) |
+| MaxEnvelope | Green 300 (glow) | #81C784 / #388E3C |
+| MinEnvelope | Red 300 (glow) | #E57373 / #D32F2F |
+| RMSEnvelope | Orange 300 (glow) | #FFB74D / #EF6C00 |
+| Peak-to-Peak | Teal (fill) | #80CBC4 / #009688 @ 12% alpha |
 | Live Cursor | White (default) | #FFFFFF @ 50% alpha, matches nearest line on proximity |
 | Pinned Cursor | Gray (dashed) | #AAAAAA @ 70% alpha |
 
@@ -310,7 +320,7 @@ Note: Custom waveform names (via rename) are used for column headers. Spaces rep
 
 ## Testing Protocol
 
-### Automated Tests (87 tests)
+### Automated Tests (106 tests)
 Run: `python -m pytest test_waveform_analyzer.py -v`
 
 Covers the pre-commit checklist automatically:
@@ -328,6 +338,10 @@ Covers the pre-commit checklist automatically:
 | `TestNoErrors` | No console errors or warnings | 5 |
 | `TestPerformance` | FPS >30 (gen <100ms, envelope <10ms) | 3 |
 | `TestConfig` | Configuration load/save | 3 |
+| `TestMATExport` | MATLAB .mat export with/without envelopes | 5 |
+| `TestJSONExport` | JSON export with/without envelopes | 6 |
+| `TestColorCustomization` | Color assignment, custom colors, preserve on remove | 4 |
+| `TestThemeToggle` | Theme dicts, key consistency, config default | 4 |
 
 ### Pre-Commit Checklist (Manual Items)
 After running automated tests, verify these UI-dependent items manually:
@@ -343,6 +357,7 @@ After running automated tests, verify these UI-dependent items manually:
 8. **Auto-hide:** Enable envelope, verify source waveforms hidden automatically
 9. **Configure dialog:** Open File → Configure..., change display settings, verify plot updates immediately
 10. **Config persistence:** Modify waveform defaults in Configure, restart app, verify new defaults load
+11. **Theme toggle:** File → Toggle Theme switches dark/light, verify plot/menu/sidebar update, restart to verify persistence
 
 ---
 
@@ -354,16 +369,16 @@ After running automated tests, verify these UI-dependent items manually:
 - ✅ **Measurement Cursors:** Always-on live tracking cursor with proximity highlight and pinned reference
 
 ### v1.2 - Export & Usability
-- [ ] **Export Formats:** MATLAB .mat, JSON
-- [ ] **Color Customization:** User-selectable waveform colors
-- [ ] **Theme Toggle:** Dark/light mode
+- ✅ **Export Formats:** CSV, MATLAB .mat, JSON (file dialog offers all three)
+- ✅ **Color Customization:** Right-click → Change Color... (system color chooser, persists across removes)
+- ✅ **Theme Toggle:** File → Toggle Theme switches dark/light mode (persists in `default.cfg`)
 
 ### v2.0 - Advanced Features
 - [ ] **Statistics Panel:** Mean, RMS, peak-to-peak per waveform
 - [ ] **Multiple Plots:** Separate plots option
 - [ ] **Detachable Windows:** Resizable, multi-monitor support
 - ✅ **Custom User Settings:** Configurable defaults via `default.cfg` and File → Configure... dialog
-- [ ] **Self Documented Code:** Add comments in standard format for tools like doxygen
+- ✅ **Sphinx Documentation:** Auto-generated API docs from Google-style docstrings (`docs/`)
 
 ---
 

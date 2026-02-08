@@ -42,6 +42,7 @@ def load_config() -> dict[str, Any]:
         "y_axis_title": "Amplitude",
         "y_min": 0.0,
         "y_max": 10.0,
+        "theme": "dark",
     }
 
     config_path = _get_config_path()
@@ -66,6 +67,11 @@ def load_config() -> dict[str, Any]:
         defaults["y_axis_title"] = parser.get("display", "y_axis_title").strip()
     _read_float(parser, "display", "y_min", defaults)
     _read_float(parser, "display", "y_max", defaults)
+
+    if parser.has_option("display", "theme"):
+        t = parser.get("display", "theme").strip().lower()
+        if t in ("dark", "light"):
+            defaults["theme"] = t
 
     return defaults
 
@@ -109,6 +115,8 @@ def save_config(settings: dict[str, Any]) -> bool:
             "# Y-axis minimum and maximum values",
             f"y_min = {settings.get('y_min', 0.0)}",
             f"y_max = {settings.get('y_max', 10.0)}",
+            "# Color theme: dark or light",
+            f"theme = {settings.get('theme', 'dark')}",
             "",
         ]
         with open(config_path, "w", encoding="utf-8") as f:

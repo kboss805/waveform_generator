@@ -34,8 +34,23 @@ from app_state import (
     DUTY_MIN, DUTY_MAX, DURATION_MIN, DURATION_MAX,
     OFFSET_MIN, OFFSET_MAX,
 )
-from data_export import export_to_csv, prep_wf_for_export, sanitize_fname
+from data_export import (
+    export_to_csv, export_to_mat, export_to_json,
+    prep_wf_for_export, sanitize_fname,
+)
+from scipy.io import loadmat
 from config import load_config, save_config
+from ui_components import DARK_THEME, LIGHT_THEME
+
+
+# ---------------------------------------------------------------------------
+# Shared test helpers
+# ---------------------------------------------------------------------------
+
+def _make_test_export_wf(name: str = "TestWave"):
+    """Create a waveform tuple suitable for export tests."""
+    t, y = gen_sine_wf(1.0, amp=2.0, offset=5.0, dur=1.0)
+    return prep_wf_for_export(name, t, y, "sine", 1.0, 2.0, 5.0, 50.0)
 
 
 # ---------------------------------------------------------------------------
@@ -415,16 +430,9 @@ class TestEnvelopeToggles:
 class TestCSVExport:
     """Verify CSV export for waveform data with and without envelopes."""
 
-    def _make_export_wf(self, name: str = "TestWave"):
-        """Create a waveform tuple suitable for export."""
-        t, y = gen_sine_wf(1.0, amp=2.0, offset=5.0, dur=1.0)
-        return prep_wf_for_export(
-            name, t, y, "sine", 1.0, 2.0, 5.0, 50.0
-        )
-
     def test_export_without_envelopes(self) -> None:
         """Export single waveform without envelopes succeeds."""
-        wf = self._make_export_wf()
+        wf = _make_test_export_wf()
         with tempfile.NamedTemporaryFile(
             suffix=".csv", delete=False, mode="w"
         ) as f:
@@ -442,8 +450,8 @@ class TestCSVExport:
 
     def test_export_with_envelopes(self) -> None:
         """Export with envelopes includes envelope columns."""
-        wf1 = self._make_export_wf("Wave1")
-        wf2 = self._make_export_wf("Wave2")
+        wf1 = _make_test_export_wf("Wave1")
+        wf2 = _make_test_export_wf("Wave2")
         t1 = wf1[1]
         y1 = wf1[2]
         t2 = wf2[1]
@@ -468,7 +476,7 @@ class TestCSVExport:
 
     def test_export_multiple_waveforms(self) -> None:
         """Export with 5 waveforms succeeds."""
-        wfs = [self._make_export_wf(f"Wf{i}") for i in range(5)]
+        wfs = [_make_test_export_wf(f"Wf{i}") for i in range(5)]
         with tempfile.NamedTemporaryFile(
             suffix=".csv", delete=False, mode="w"
         ) as f:
@@ -518,11 +526,13 @@ class TestCSVExport:
             os.unlink(path)
 
     def test_sanitize_filename(self) -> None:
-        """Filename sanitization removes invalid chars, adds .csv."""
+        """Filename sanitization removes invalid chars, adds extension."""
         assert sanitize_fname("test").endswith(".csv")
         assert sanitize_fname("test.csv") == "test.csv"
         assert "<" not in sanitize_fname("te<st>.csv")
         assert sanitize_fname("").endswith(".csv")
+        assert sanitize_fname("test.mat").endswith(".mat")
+        assert sanitize_fname("test.json").endswith(".json")
 
 
 # ---------------------------------------------------------------------------
@@ -580,14 +590,16 @@ class TestWaveformLimits:
         ids = [wf.id for wf in state.wfs]
         assert ids == [0, 1]
 
-    def test_colors_reassigned_after_remove(self) -> None:
-        """Colors follow the palette order after removal."""
+    def test_colors_preserved_after_remove(self) -> None:
+        """Colors are preserved (not reassigned) after removal."""
         state = AppState()
         state.add_wf()
         state.add_wf()
+        original_colors = [wf.color for wf in state.wfs]
         state.remove_wf(0)
-        for idx, wf in enumerate(state.wfs):
-            assert wf.color == AppState.COLORS[idx]
+        # Remaining waveforms keep their original colors
+        assert state.wfs[0].color == original_colors[1]
+        assert state.wfs[1].color == original_colors[2]
 
     def test_active_index_adjusted_on_remove(self) -> None:
         """Active waveform index stays in bounds after removal."""
@@ -711,3 +723,295 @@ class TestConfig:
         """Waveform type is one of the 4 valid types."""
         cfg = load_config()
         assert cfg["waveform_type"] in ("sine", "square", "sawtooth", "triangle")
+
+
+# ---------------------------------------------------------------------------
+# MATLAB .mat export
+# ---------------------------------------------------------------------------
+
+class TestMATExport:
+    """Verify MATLAB .mat export functionality."""
+
+    def test_export_mat_creates_file(self) -> None:
+        """MAT export creates a valid .mat file."""
+        wf = _make_test_export_wf()
+        with tempfile.NamedTemporaryFile(
+            suffix=".mat", delete=False
+        ) as f:
+            path = f.name
+        try:
+            ok, msg = export_to_mat(path, [wf])
+            assert ok is True
+            assert os.path.exists(path)
+        finally:
+            os.unlink(path)
+
+    def test_export_mat_contains_variables(self) -> None:
+        """MAT file contains time, waveform, and metadata variables."""
+        wf = _make_test_export_wf("Wave1")
+        with tempfile.NamedTemporaryFile(
+            suffix=".mat", delete=False
+        ) as f:
+            path = f.name
+        try:
+            export_to_mat(path, [wf])
+            data = loadmat(path)
+            assert 'time' in data
+            assert 'Wave1' in data
+            assert 'sample_rate' in data
+            assert 'duration' in data
+        finally:
+            os.unlink(path)
+
+    def test_export_mat_values_match(self) -> None:
+        """MAT file waveform data matches source arrays."""
+        t, y = gen_sine_wf(1.0, amp=2.0, offset=5.0, dur=0.5)
+        wf = prep_wf_for_export("Sig", t, y, "sine", 1.0, 2.0, 5.0, 50.0)
+        with tempfile.NamedTemporaryFile(
+            suffix=".mat", delete=False
+        ) as f:
+            path = f.name
+        try:
+            export_to_mat(path, [wf])
+            data = loadmat(path)
+            np.testing.assert_allclose(
+                data['time'].flatten(), t, atol=1e-9
+            )
+            np.testing.assert_allclose(
+                data['Sig'].flatten(), y, atol=1e-9
+            )
+        finally:
+            os.unlink(path)
+
+    def test_export_mat_with_envelopes(self) -> None:
+        """MAT export includes envelope variables."""
+        wf1 = _make_test_export_wf("W1")
+        wf2 = _make_test_export_wf("W2")
+        wfs = [(wf1[1], wf1[2]), (wf2[1], wf2[2])]
+        _, max_env = compute_max_env(wfs)
+        envs = [("Max_Envelope", wf1[1], max_env)]
+        with tempfile.NamedTemporaryFile(
+            suffix=".mat", delete=False
+        ) as f:
+            path = f.name
+        try:
+            ok, _ = export_to_mat(path, [wf1, wf2], envs=envs)
+            assert ok is True
+            data = loadmat(path)
+            assert 'Max_Envelope' in data
+        finally:
+            os.unlink(path)
+
+    def test_export_mat_no_data(self) -> None:
+        """MAT export with empty data returns failure."""
+        with tempfile.NamedTemporaryFile(
+            suffix=".mat", delete=False
+        ) as f:
+            path = f.name
+        try:
+            ok, _ = export_to_mat(path, [])
+            assert ok is False
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# JSON export
+# ---------------------------------------------------------------------------
+
+class TestJSONExport:
+    """Verify JSON export functionality."""
+
+    def test_export_json_creates_file(self) -> None:
+        """JSON export creates a valid .json file."""
+        wf = _make_test_export_wf()
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        ) as f:
+            path = f.name
+        try:
+            ok, msg = export_to_json(path, [wf])
+            assert ok is True
+            assert os.path.exists(path)
+        finally:
+            os.unlink(path)
+
+    def test_export_json_structure(self) -> None:
+        """JSON file has expected top-level keys."""
+        wf = _make_test_export_wf("Wave1")
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        ) as f:
+            path = f.name
+        try:
+            export_to_json(path, [wf])
+            import json
+            with open(path, 'r') as f:
+                data = json.load(f)
+            assert 'exported' in data
+            assert 'sample_rate' in data
+            assert 'duration' in data
+            assert 'time' in data
+            assert 'waveforms' in data
+            assert 'envelopes' in data
+            assert len(data['waveforms']) == 1
+            assert data['waveforms'][0]['name'] == 'Wave1'
+        finally:
+            os.unlink(path)
+
+    def test_export_json_values_match(self) -> None:
+        """JSON waveform data matches source arrays."""
+        t, y = gen_sine_wf(1.0, amp=2.0, offset=5.0, dur=0.5)
+        wf = prep_wf_for_export("Sig", t, y, "sine", 1.0, 2.0, 5.0, 50.0)
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        ) as f:
+            path = f.name
+        try:
+            export_to_json(path, [wf])
+            import json
+            with open(path, 'r') as f:
+                data = json.load(f)
+            np.testing.assert_allclose(
+                data['time'], t.tolist(), atol=1e-9
+            )
+            np.testing.assert_allclose(
+                data['waveforms'][0]['amplitude_data'],
+                y.tolist(), atol=1e-9
+            )
+        finally:
+            os.unlink(path)
+
+    def test_export_json_with_envelopes(self) -> None:
+        """JSON export includes envelope data."""
+        wf1 = _make_test_export_wf("W1")
+        wf2 = _make_test_export_wf("W2")
+        wfs = [(wf1[1], wf1[2]), (wf2[1], wf2[2])]
+        _, max_env = compute_max_env(wfs)
+        envs = [("Max_Envelope", wf1[1], max_env)]
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        ) as f:
+            path = f.name
+        try:
+            ok, _ = export_to_json(path, [wf1, wf2], envs=envs)
+            assert ok is True
+            import json
+            with open(path, 'r') as f:
+                data = json.load(f)
+            assert len(data['envelopes']) == 1
+            assert data['envelopes'][0]['name'] == 'Max_Envelope'
+        finally:
+            os.unlink(path)
+
+    def test_export_json_no_data(self) -> None:
+        """JSON export with empty data returns failure."""
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        ) as f:
+            path = f.name
+        try:
+            ok, _ = export_to_json(path, [])
+            assert ok is False
+        finally:
+            if os.path.exists(path):
+                os.unlink(path)
+
+    def test_export_json_waveform_params(self) -> None:
+        """JSON export includes waveform parameters."""
+        t, y = gen_square_wf(2.0, amp=3.0, duty_cycle=75.0, offset=1.0)
+        wf = prep_wf_for_export(
+            "SquareWave", t, y, "square", 2.0, 3.0, 1.0, 75.0
+        )
+        with tempfile.NamedTemporaryFile(
+            suffix=".json", delete=False
+        ) as f:
+            path = f.name
+        try:
+            export_to_json(path, [wf])
+            import json
+            with open(path, 'r') as f:
+                data = json.load(f)
+            wf_data = data['waveforms'][0]
+            assert wf_data['type'] == 'square'
+            assert wf_data['frequency'] == 2.0
+            assert wf_data['duty_cycle'] == 75.0
+        finally:
+            os.unlink(path)
+
+
+# ---------------------------------------------------------------------------
+# Color customization
+# ---------------------------------------------------------------------------
+
+class TestColorCustomization:
+    """Verify waveform color customization support."""
+
+    def test_default_color_assignment(self) -> None:
+        """Initial waveforms get colors from the palette."""
+        state = AppState()
+        assert state.wfs[0].color == AppState.COLORS[0]
+        state.add_wf()
+        assert state.wfs[1].color == AppState.COLORS[1]
+
+    def test_color_tuple_format(self) -> None:
+        """Color is an RGB tuple with int values 0-255."""
+        state = AppState()
+        r, g, b = state.wfs[0].color
+        assert isinstance(r, int) and 0 <= r <= 255
+        assert isinstance(g, int) and 0 <= g <= 255
+        assert isinstance(b, int) and 0 <= b <= 255
+
+    def test_custom_color_assignment(self) -> None:
+        """Setting a custom color persists on the waveform."""
+        state = AppState()
+        custom = (128, 64, 200)
+        state.wfs[0].color = custom
+        assert state.wfs[0].color == custom
+
+    def test_color_preserved_on_remove(self) -> None:
+        """Custom color survives removal of another waveform."""
+        state = AppState()
+        state.add_wf()
+        state.add_wf()
+        custom = (100, 200, 50)
+        state.wfs[2].color = custom
+        state.remove_wf(1)
+        # Waveform with custom color is now at index 1
+        assert state.wfs[1].color == custom
+
+
+# ---------------------------------------------------------------------------
+# Theme toggle
+# ---------------------------------------------------------------------------
+
+class TestThemeToggle:
+    """Verify dark/light theme definitions and config persistence."""
+
+    REQUIRED_KEYS = {
+        "surface", "surface_container", "surface_container_hi",
+        "section_header", "text", "text_disabled", "bg", "plot_bg",
+        "selected_bg", "selected_border", "separator", "border",
+        "wf_on", "wf_off", "remove_btn", "success", "error",
+        "rms", "p2p_fill", "cursor_default", "cursor_pinned",
+        "btn_primary", "btn_primary_text", "btn_tonal", "btn_tonal_text",
+        "plt_style", "ctk_mode",
+    }
+
+    def test_dark_theme_has_all_keys(self) -> None:
+        """DARK_THEME contains every required key."""
+        assert self.REQUIRED_KEYS.issubset(DARK_THEME.keys())
+
+    def test_light_theme_has_all_keys(self) -> None:
+        """LIGHT_THEME contains every required key."""
+        assert self.REQUIRED_KEYS.issubset(LIGHT_THEME.keys())
+
+    def test_theme_keys_match(self) -> None:
+        """Both themes have identical key sets."""
+        assert set(DARK_THEME.keys()) == set(LIGHT_THEME.keys())
+
+    def test_config_theme_default(self) -> None:
+        """Config loads 'dark' as default theme."""
+        cfg = load_config()
+        assert cfg.get("theme") in ("dark", "light")

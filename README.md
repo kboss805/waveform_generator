@@ -49,7 +49,7 @@ env\Scripts\python.exe main.py
    - Click on a waveform in the list to select and edit it
    - Click the **ON/OFF button** to show/hide a waveform
    - Click the **X button** to remove a waveform (minimum 1 required)
-   - **Right-click** a waveform button to rename it (custom names appear in the plot legend and CSV export)
+   - **Right-click** a waveform button to rename it or change its color (custom names appear in the plot legend and CSV export)
 
 ### Envelope Analysis
 
@@ -94,10 +94,17 @@ Default settings are stored in `default.cfg` (INI format) alongside the applicat
 
 > **Note:** Display settings (Y-axis title and range) take effect immediately. Waveform defaults apply the next time the application is launched.
 
+### Theme Toggle
+
+Switch between dark and light mode via **File → Toggle Theme**. The theme choice persists across sessions in `default.cfg`.
+
 ### Exporting Data
 
-1. Click **Export to CSV**
-2. A native file dialog will open - choose your save location and filename
+1. Click **Export to CSV** (button exports to any supported format)
+2. A native file dialog will open — choose format from the file type dropdown:
+   - **CSV** (.csv) — time + amplitude columns with metadata comments
+   - **MATLAB** (.mat) — named variables per waveform/envelope
+   - **JSON** (.json) — structured document with parameters and data arrays
 3. Exported data includes:
    - All enabled waveforms
    - Active envelopes (if enabled)
@@ -107,17 +114,17 @@ Default settings are stored in `default.cfg` (INI format) alongside the applicat
 
 - **4 Waveform Types:** Sine, Square, Sawtooth, Triangle
 - **Up to 5 simultaneous waveforms**
-- **Custom waveform naming** via right-click context menu
+- **Custom waveform naming and colors** via right-click context menu
 - **Real-time visualization** with responsive performance
 - **Envelope analysis** with glowing Max/Min/RMS envelope lines and Peak-to-Peak fill
 - **Live measurement cursors** with real-time tracking, proximity highlight, and pinned reference
 - **Auto-hide source waveforms** when envelopes are enabled
-- **CSV export** with native OS file dialog (includes custom names)
+- **Multi-format export** (CSV, MATLAB .mat, JSON) with native OS file dialog
 - **Independent waveform control**
 - **Configurable defaults** via File → Configure... dialog and `default.cfg`
 - **Help menu** with About dialog (version, author info)
 - **Modern Windows 11 UI** with CustomTkinter
-- **Dark theme** matplotlib plotting
+- **Dark/Light theme toggle** via File → Toggle Theme (persists across sessions)
 
 ## File Structure
 
@@ -129,12 +136,18 @@ waveform_analyzer/
 ├── ui_components.py              # UI and callbacks
 ├── data_export.py                # CSV export functionality
 ├── config.py                     # Configuration loader/saver
-├── test_waveform_analyzer.py     # Automated pre-commit tests (87 tests)
+├── test_waveform_analyzer.py     # Automated pre-commit tests (106 tests)
 ├── default.cfg                   # User-editable default settings (INI format)
 ├── icon.ico                      # Application icon
 ├── requirements.txt              # Python dependencies
 ├── CLAUDE.md                     # Full specification document
-└── README.md                     # This file
+├── README.md                     # This file
+└── docs/                         # Sphinx documentation source
+    ├── conf.py                   # Sphinx configuration
+    ├── index.rst                 # Documentation landing page
+    ├── make.bat                  # Windows build script
+    ├── Makefile                  # Linux/macOS build script
+    └── *.rst                     # Per-module API reference pages
 ```
 
 ## System Requirements
@@ -167,7 +180,21 @@ pip install pytest
 python -m pytest test_waveform_analyzer.py -v
 ```
 
-The 87 tests cover all pre-commit checklist items: wave types, edge cases, duty cycle, durations, envelope calculations, enabled/disabled state, CSV export, waveform limits, error handling, and performance SLAs.
+The 106 tests cover all pre-commit checklist items: wave types, edge cases, duty cycle, durations, envelope calculations, enabled/disabled state, CSV export, waveform limits, error handling, and performance SLAs.
+
+## Documentation
+
+API documentation is auto-generated from source code docstrings using [Sphinx](https://www.sphinx-doc.org/).
+
+### Building the Docs
+
+```bash
+pip install sphinx sphinx-rtd-theme
+cd docs
+make.bat html
+```
+
+The generated HTML will be in `build/sphinx/html/`. Open `build/sphinx/html/index.html` to browse.
 
 ## Keyboard Shortcuts
 
@@ -194,6 +221,6 @@ The 87 tests cover all pre-commit checklist items: wave types, edge cases, duty 
 
 ## Version
 
-Current version: **1.1.0**
+Current version: **1.2.0**
 
 See [CLAUDE.md](CLAUDE.md) for the complete specification and future roadmap.

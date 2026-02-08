@@ -92,11 +92,11 @@ class AppState:
 
     # Color palette for auto-assignment
     COLORS = [
-        (255, 255, 0),    # Yellow
-        (0, 255, 255),    # Cyan
-        (255, 0, 255),    # Magenta
-        (0, 255, 0),      # Green
-        (255, 165, 0)     # Orange
+        (79, 195, 247),   # Light Blue 300
+        (240, 98, 146),   # Pink 300
+        (255, 138, 101),  # Deep Orange 300
+        (102, 187, 106),  # Green 400
+        (179, 157, 219)   # Deep Purple 200
     ]
 
     MAX_WFS = 5
@@ -169,10 +169,9 @@ class AppState:
         # Find and remove waveform
         self.wfs = [w for w in self.wfs if w.id != wf_id]
 
-        # Reassign IDs and colors
+        # Reassign IDs (preserve colors for custom color support)
         for idx, wf in enumerate(self.wfs):
             wf.id = idx
-            wf.color = self.COLORS[idx % len(self.COLORS)]
 
         # Update active index if needed
         if self.active_wf_index >= len(self.wfs):
