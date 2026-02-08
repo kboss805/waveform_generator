@@ -6,6 +6,8 @@ This module contains all CustomTkinter UI creation and callback logic.
 
 import os
 import sys
+from typing import Any
+import tkinter as tk
 import customtkinter as ctk
 from tkinter import filedialog, Menu, Toplevel, Label
 from CTkMenuBar import CTkMenuBar, CustomDropdownMenu
@@ -14,13 +16,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 
 from app_state import (
-    app_state, DEFAULT_DURATION,
+    app_state,
+    DEFAULT_DURATION, DEFAULT_FREQ, DEFAULT_AMP, DEFAULT_OFFSET, DEFAULT_DUTY_CYCLE,
     DURATION_MIN, DURATION_MAX, DURATION_STEP,
     FREQ_MIN, FREQ_MAX, FREQ_STEP,
     AMP_MIN, AMP_MAX, AMP_STEP,
     OFFSET_MIN, OFFSET_MAX, OFFSET_STEP,
     DUTY_MIN, DUTY_MAX, DUTY_STEP
 )
+from config import load_config, save_config
 from waveform_generator import gen_wf, compute_max_env, compute_min_env
 from data_export import export_to_csv, prep_wf_for_export
 
@@ -37,6 +41,19 @@ SECTION_HEADER_COLOR = "#FFFF00"  # Yellow
 ENABLED_TEXT_COLOR = "#FFFFFF"
 DISABLED_TEXT_COLOR = "#808080"
 
+# Theme colors
+COLOR_DARK_BG = "#2b2b2b"
+COLOR_PLOT_BG = "#1a1a1a"
+COLOR_SELECTED_BG = "#3d3d6b"
+COLOR_SELECTED_BORDER = "#6496ff"
+COLOR_SEPARATOR = "#666666"
+COLOR_BORDER = "#444444"
+COLOR_WF_ON = "#009600"
+COLOR_WF_OFF = "#646464"
+COLOR_REMOVE_BTN = "#8B0000"
+COLOR_SUCCESS = "#00FF00"
+COLOR_ERROR = "#FF0000"
+
 
 class WaveformApp(ctk.CTk):
     """Main application window."""
@@ -51,6 +68,12 @@ class WaveformApp(ctk.CTk):
 
         # Set window icon
         self._set_icon()
+
+        # Load display settings from config (live — can be updated at runtime)
+        _cfg = load_config()
+        self._plot_y_min: float = _cfg["y_min"]
+        self._plot_y_max: float = _cfg["y_max"]
+        self._plot_y_title: str = _cfg["y_axis_title"]
 
         # Store widget references
         self.wf_buttons = []
@@ -80,16 +103,18 @@ class WaveformApp(ctk.CTk):
         self._update_add_button()
         self._update_all_plots()
 
-    def _set_icon(self):
-        """Set the window icon if available."""
-        # Determine base path (handles PyInstaller bundled app)
+    @staticmethod
+    def _get_icon_path() -> str:
+        """Return icon path for both PyInstaller-bundled and dev environments."""
         if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
+            base_path = getattr(sys, '_MEIPASS')
         else:
             base_path = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base_path, "icon.ico")
 
-        icon_path = os.path.join(base_path, "icon.ico")
-
+    def _set_icon(self):
+        """Set the window icon if available."""
+        icon_path = self._get_icon_path()
         if os.path.exists(icon_path):
             self.iconbitmap(icon_path)
 
@@ -97,10 +122,31 @@ class WaveformApp(ctk.CTk):
         """Create the application menu bar using CTkMenuBar."""
         self.menu_bar = CTkMenuBar(
             master=self,
-            bg_color=["#2b2b2b", "#1a1a1a"],
+            bg_color=(COLOR_DARK_BG, COLOR_PLOT_BG),
             height=28,
             padx=5,
             pady=2
+        )
+
+        # File menu
+        file_btn = self.menu_bar.add_cascade(
+            text="File",
+            text_color=["#ffffff", "#ffffff"],
+            fg_color="transparent"
+        )
+        file_dropdown = CustomDropdownMenu(
+            widget=file_btn,
+            width=150,
+            height=30,
+            bg_color=(COLOR_DARK_BG, COLOR_DARK_BG),
+            border_color=(COLOR_BORDER, COLOR_BORDER),
+            text_color=(ENABLED_TEXT_COLOR, ENABLED_TEXT_COLOR),
+            hover_color=(COLOR_SELECTED_BG, COLOR_SELECTED_BG),
+            corner_radius=6
+        )
+        file_dropdown.add_option(
+            option="Configure...",
+            command=self._on_configure
         )
 
         # Help menu
@@ -113,16 +159,137 @@ class WaveformApp(ctk.CTk):
             widget=help_btn,
             width=150,
             height=30,
-            bg_color=["#2b2b2b", "#2b2b2b"],
-            border_color=["#444444", "#444444"],
-            text_color=["#ffffff", "#ffffff"],
-            hover_color=["#3d3d6b", "#3d3d6b"],
+            bg_color=(COLOR_DARK_BG, COLOR_DARK_BG),
+            border_color=(COLOR_BORDER, COLOR_BORDER),
+            text_color=(ENABLED_TEXT_COLOR, ENABLED_TEXT_COLOR),
+            hover_color=(COLOR_SELECTED_BG, COLOR_SELECTED_BG),
             corner_radius=6
         )
         help_dropdown.add_option(
             option="About...",
             command=self._show_about_dialog
         )
+
+    def _on_configure(self):
+        """Open the Configure dialog."""
+        current = load_config()
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Configure Defaults")
+        dialog.geometry("420x640")
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.grab_set()
+
+        icon_path = self._get_icon_path()
+        if os.path.exists(icon_path):
+            dialog.after(200, lambda: dialog.iconbitmap(icon_path))
+
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - 420) // 2
+        y = self.winfo_y() + (self.winfo_height() - 640) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        content = ctk.CTkFrame(dialog, fg_color="transparent")
+        content.pack(expand=True, fill="both", padx=20, pady=20)
+
+        ctk.CTkLabel(
+            content, text="Configure Defaults",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(pady=(0, 2))
+        ctk.CTkLabel(
+            content, text="Changes take effect on next launch.",
+            text_color=COLOR_SEPARATOR
+        ).pack(pady=(0, 10))
+
+        def add_section(text: str):
+            sep = ctk.CTkFrame(content, height=1, fg_color=COLOR_SEPARATOR)
+            sep.pack(fill="x", pady=(8, 4))
+            ctk.CTkLabel(
+                content, text=text,
+                text_color=SECTION_HEADER_COLOR,
+                font=ctk.CTkFont(weight="bold")
+            ).pack(anchor="w")
+
+        def add_row(label_text: str, default_val: Any) -> ctk.CTkEntry:
+            row = ctk.CTkFrame(content, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+            ctk.CTkLabel(row, text=label_text, width=160, anchor="w").pack(side="left")
+            entry = ctk.CTkEntry(row, width=180)
+            entry.insert(0, str(default_val))
+            entry.pack(side="left")
+            return entry
+
+        # Global
+        add_section("Global")
+        dur_entry = add_row("Duration (s):", current["duration"])
+
+        # Waveform Defaults
+        add_section("Waveform Defaults")
+        type_var = ctk.StringVar(value=current["waveform_type"])
+        type_row = ctk.CTkFrame(content, fg_color="transparent")
+        type_row.pack(fill="x", pady=2)
+        ctk.CTkLabel(type_row, text="Type:", width=160, anchor="w").pack(side="left")
+        ctk.CTkOptionMenu(
+            type_row, variable=type_var,
+            values=["sine", "square", "sawtooth", "triangle"], width=180
+        ).pack(side="left")
+        freq_entry = add_row("Frequency (Hz):", current["frequency"])
+        amp_entry = add_row("Amplitude:", current["amplitude"])
+        offset_entry = add_row("Offset:", current["offset"])
+        duty_entry = add_row("Duty Cycle (%) - For Square Waves:", current["duty_cycle"])
+
+        # Display
+        add_section("Display")
+        y_title_entry = add_row("Y-Axis Title:", current["y_axis_title"])
+        y_min_entry = add_row("Y-Axis Min:", current["y_min"])
+        y_max_entry = add_row("Y-Axis Max:", current["y_max"])
+
+        # Status label
+        status_lbl = ctk.CTkLabel(content, text="")
+        status_lbl.pack(pady=(10, 0))
+
+        # Buttons
+        btn_frame = ctk.CTkFrame(content, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(5, 0))
+
+        def on_save():
+            try:
+                new_settings = {
+                    "duration": max(DURATION_MIN, min(DURATION_MAX, float(dur_entry.get()))),
+                    "waveform_type": type_var.get(),
+                    "frequency": max(FREQ_MIN, min(FREQ_MAX, float(freq_entry.get()))),
+                    "amplitude": max(AMP_MIN, min(AMP_MAX, float(amp_entry.get()))),
+                    "offset": max(OFFSET_MIN, min(OFFSET_MAX, float(offset_entry.get()))),
+                    "duty_cycle": max(DUTY_MIN, min(DUTY_MAX, float(duty_entry.get()))),
+                    "y_axis_title": y_title_entry.get().strip() or "Amplitude",
+                    "y_min": float(y_min_entry.get()),
+                    "y_max": float(y_max_entry.get()),
+                }
+            except ValueError:
+                status_lbl.configure(
+                    text="Invalid value. Please check inputs.",
+                    text_color=COLOR_ERROR
+                )
+                return
+            if save_config(new_settings):
+                # Apply display settings immediately
+                self._plot_y_min = new_settings["y_min"]
+                self._plot_y_max = new_settings["y_max"]
+                self._plot_y_title = new_settings["y_axis_title"]
+                self._update_all_plots()
+                status_lbl.configure(
+                    text="Saved. Waveform defaults apply on next launch.",
+                    text_color=COLOR_SUCCESS
+                )
+            else:
+                status_lbl.configure(
+                    text="Failed to save configuration.",
+                    text_color=COLOR_ERROR
+                )
+
+        ctk.CTkButton(btn_frame, text="Save", width=100, command=on_save).pack(side="left", padx=(0, 10))
+        ctk.CTkButton(btn_frame, text="Cancel", width=100, command=dialog.destroy).pack(side="left")
 
     def _show_about_dialog(self):
         """Show the About dialog."""
@@ -134,11 +301,7 @@ class WaveformApp(ctk.CTk):
         dialog.grab_set()
 
         # Set dialog icon
-        if getattr(sys, 'frozen', False):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-        icon_path = os.path.join(base_path, "icon.ico")
+        icon_path = self._get_icon_path()
         if os.path.exists(icon_path):
             dialog.after(200, lambda: dialog.iconbitmap(icon_path))
 
@@ -225,7 +388,7 @@ class WaveformApp(ctk.CTk):
 
         self.duration_entry = ctk.CTkEntry(self.duration_frame, width=120)
         self.duration_entry.pack(side="left", padx=(0, 5))
-        self.duration_entry.insert(0, str(DEFAULT_DURATION))
+        self.duration_entry.insert(0, f"{DEFAULT_DURATION:.1f}")
         self.duration_entry.bind("<Return>", self._on_duration_enter)
         self.duration_entry.bind("<FocusOut>", self._on_duration_enter)
 
@@ -248,7 +411,7 @@ class WaveformApp(ctk.CTk):
 
         self.offset_entry = ctk.CTkEntry(self.offset_frame, width=120)
         self.offset_entry.pack(side="left", padx=(0, 5))
-        self.offset_entry.insert(0, "8.0")
+        self.offset_entry.insert(0, f"{DEFAULT_OFFSET:.1f}")
         self.offset_entry.bind("<Return>", self._on_offset_enter)
         self.offset_entry.bind("<FocusOut>", self._on_offset_enter)
 
@@ -271,7 +434,7 @@ class WaveformApp(ctk.CTk):
 
         self.freq_entry = ctk.CTkEntry(self.freq_frame, width=120)
         self.freq_entry.pack(side="left", padx=(0, 5))
-        self.freq_entry.insert(0, str(FREQ_MIN))
+        self.freq_entry.insert(0, f"{DEFAULT_FREQ:.1f}")
         self.freq_entry.bind("<Return>", self._on_freq_enter)
         self.freq_entry.bind("<FocusOut>", self._on_freq_enter)
 
@@ -294,7 +457,7 @@ class WaveformApp(ctk.CTk):
 
         self.amp_entry = ctk.CTkEntry(self.amp_frame, width=120)
         self.amp_entry.pack(side="left", padx=(0, 5))
-        self.amp_entry.insert(0, "2.0")
+        self.amp_entry.insert(0, f"{DEFAULT_AMP:.1f}")
         self.amp_entry.bind("<Return>", self._on_amp_enter)
         self.amp_entry.bind("<FocusOut>", self._on_amp_enter)
 
@@ -316,7 +479,7 @@ class WaveformApp(ctk.CTk):
 
         self.duty_entry = ctk.CTkEntry(self.duty_frame, width=120)
         self.duty_entry.pack(side="left", padx=(0, 5))
-        self.duty_entry.insert(0, "50.0")
+        self.duty_entry.insert(0, f"{DEFAULT_DUTY_CYCLE:.1f}")
         self.duty_entry.bind("<Return>", self._on_duty_enter)
         self.duty_entry.bind("<FocusOut>", self._on_duty_enter)
 
@@ -374,7 +537,7 @@ class WaveformApp(ctk.CTk):
 
         self.export_status = ctk.CTkLabel(
             self.sidebar, text="Status: Ready",
-            text_color="#00FF00"
+            text_color=COLOR_SUCCESS
         )
         self.export_status.pack(anchor="w", pady=(5, 10))
 
@@ -388,14 +551,14 @@ class WaveformApp(ctk.CTk):
 
         # Create matplotlib figure with dark theme
         plt.style.use('dark_background')
-        self.fig = Figure(figsize=(8, 6), facecolor='#1a1a1a')
+        self.fig = Figure(figsize=(8, 6), facecolor=COLOR_PLOT_BG)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_facecolor('#1a1a1a')
+        self.ax.set_facecolor(COLOR_PLOT_BG)
 
         # Configure axes
         self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Amplitude")
-        self.ax.grid(True, alpha=0.3, color='#666666')
+        self.ax.set_ylabel(self._plot_y_title)
+        self.ax.grid(True, alpha=0.3, color=COLOR_SEPARATOR)
 
         # Embed in tkinter
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
@@ -418,7 +581,7 @@ class WaveformApp(ctk.CTk):
     def _add_section_header(self, text: str):
         """Add a section header with separator."""
         # Separator line
-        separator = ctk.CTkFrame(self.sidebar, height=1, fg_color="#666666")
+        separator = ctk.CTkFrame(self.sidebar, height=1, fg_color=COLOR_SEPARATOR)
         separator.pack(fill="x", pady=(10, 5))
 
         # Header text
@@ -467,13 +630,13 @@ class WaveformApp(ctk.CTk):
 
             prompt = f'"{check_name}" is already in use.\nEnter a different name:'
 
-    def _show_wf_context_menu(self, event, wf_id: int):
+    def _show_wf_context_menu(self, event: tk.Event[Any], wf_id: int):
         """Show right-click context menu for a waveform button."""
         menu_style = {
-            "bg": "#2b2b2b",
-            "fg": "#ffffff",
-            "activebackground": "#3d3d6b",
-            "activeforeground": "#ffffff",
+            "bg": COLOR_DARK_BG,
+            "fg": ENABLED_TEXT_COLOR,
+            "activebackground": COLOR_SELECTED_BG,
+            "activeforeground": ENABLED_TEXT_COLOR,
             "relief": "flat",
             "borderwidth": 0,
         }
@@ -482,9 +645,10 @@ class WaveformApp(ctk.CTk):
             label="Rename...",
             command=lambda: self._on_rename_wf(wf_id)
         )
+        ctx_menu.bind("<Unmap>", lambda _: ctx_menu.destroy())
         ctx_menu.tk_popup(event.x_root, event.y_root)
 
-    def _show_tooltip(self, event):
+    def _show_tooltip(self, event: tk.Event[Any]):
         """Show tooltip near the cursor."""
         self._hide_tooltip()
         tip = Toplevel(self)
@@ -492,20 +656,20 @@ class WaveformApp(ctk.CTk):
         tip.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
         lbl = Label(
             tip, text="Right-click to change waveform name",
-            background="#2b2b2b", foreground="#ffffff",
+            background=COLOR_DARK_BG, foreground=ENABLED_TEXT_COLOR,
             relief="solid", borderwidth=1,
             padx=6, pady=3, font=("Segoe UI", 9)
         )
         lbl.pack()
         self._tooltip = tip
 
-    def _hide_tooltip(self, event=None):
+    def _hide_tooltip(self, event: tk.Event[Any] | None = None):
         """Destroy the tooltip if it exists."""
         if self._tooltip:
             self._tooltip.destroy()
             self._tooltip = None
 
-    def _on_duration_enter(self, event=None):
+    def _on_duration_enter(self, event: tk.Event[Any] | None = None):
         """Handle duration entry."""
         try:
             value = float(self.duration_entry.get())
@@ -599,7 +763,7 @@ class WaveformApp(ctk.CTk):
             self._update_wf_parameters()
             self._update_all_plots()
 
-    def _on_freq_enter(self, event=None):
+    def _on_freq_enter(self, event: tk.Event[Any] | None = None):
         """Handle frequency entry."""
         wf = app_state.get_active_wf()
         if wf:
@@ -637,7 +801,7 @@ class WaveformApp(ctk.CTk):
             self._update_freq_btns()
             self._update_all_plots()
 
-    def _on_amp_enter(self, event=None):
+    def _on_amp_enter(self, event: tk.Event[Any] | None = None):
         """Handle amplitude entry."""
         wf = app_state.get_active_wf()
         if wf:
@@ -675,7 +839,7 @@ class WaveformApp(ctk.CTk):
             self._update_amp_btns()
             self._update_all_plots()
 
-    def _on_offset_enter(self, event=None):
+    def _on_offset_enter(self, event: tk.Event[Any] | None = None):
         """Handle offset entry."""
         wf = app_state.get_active_wf()
         if wf:
@@ -713,7 +877,7 @@ class WaveformApp(ctk.CTk):
             self._update_offset_btns()
             self._update_all_plots()
 
-    def _on_duty_enter(self, event=None):
+    def _on_duty_enter(self, event: tk.Event[Any] | None = None):
         """Handle duty cycle entry."""
         wf = app_state.get_active_wf()
         if wf:
@@ -811,9 +975,9 @@ class WaveformApp(ctk.CTk):
 
         # Update status
         if success:
-            self.export_status.configure(text=message, text_color="#00FF00")
+            self.export_status.configure(text=message, text_color=COLOR_SUCCESS)
         else:
-            self.export_status.configure(text=message, text_color="#FF0000")
+            self.export_status.configure(text=message, text_color=COLOR_ERROR)
 
     # === UI Update Methods ===
 
@@ -823,10 +987,10 @@ class WaveformApp(ctk.CTk):
 
         # Configure axes
         self.ax.set_xlabel("Time (s)")
-        self.ax.set_ylabel("Amplitude")
+        self.ax.set_ylabel(self._plot_y_title)
         self.ax.set_xlim(0, app_state.duration)
-        self.ax.set_ylim(0, 15)
-        self.ax.grid(visible=True, alpha=0.3, color='#666666')
+        self.ax.set_ylim(self._plot_y_min, self._plot_y_max)
+        self.ax.grid(visible=True, alpha=0.3, color=COLOR_SEPARATOR)
 
         # Generate and plot enabled waveforms
         wf_data = []
@@ -856,11 +1020,11 @@ class WaveformApp(ctk.CTk):
         if app_state.can_show_envelopes() and wf_data:
             if app_state.show_max_env:
                 time, max_env = compute_max_env(wf_data)
-                self._plot_glowing_line(time, max_env, '#00FF00', 'Max Envelope')
+                self._plot_glowing_line(time, max_env, COLOR_SUCCESS, 'Max Envelope')
 
             if app_state.show_min_env:
                 time, min_env = compute_min_env(wf_data)
-                self._plot_glowing_line(time, min_env, '#FF0000', 'Min Envelope')
+                self._plot_glowing_line(time, min_env, COLOR_ERROR, 'Min Envelope')
 
         # Add legend if there are any lines
         if self.ax.get_lines():
@@ -872,7 +1036,7 @@ class WaveformApp(ctk.CTk):
         # Update status bar
         self._update_status_bar()
 
-    def _plot_glowing_line(self, x, y, color: str, label: str):
+    def _plot_glowing_line(self, x: Any, y: Any, color: str, label: str):
         """Plot a line with a glow effect."""
         # Outer glow layers (wider, more transparent)
         self.ax.plot(x, y, color=color, linewidth=8, alpha=0.1)
@@ -901,8 +1065,8 @@ class WaveformApp(ctk.CTk):
 
             # Selection button
             is_selected = wf.id == app_state.active_wf_index
-            fg_color = "#3d3d6b" if is_selected else "#2b2b2b"
-            border_color = "#6496ff" if is_selected else "#2b2b2b"
+            fg_color = COLOR_SELECTED_BG if is_selected else COLOR_DARK_BG
+            border_color = COLOR_SELECTED_BORDER if is_selected else COLOR_DARK_BG
             border_width = 2 if is_selected else 0
 
             wf_btn = ctk.CTkButton(
@@ -929,7 +1093,7 @@ class WaveformApp(ctk.CTk):
 
             # Visibility toggle button
             vis_text = "ON" if wf.enabled else "OFF"
-            vis_color = "#009600" if wf.enabled else "#646464"
+            vis_color = COLOR_WF_ON if wf.enabled else COLOR_WF_OFF
             vis_btn = ctk.CTkButton(
                 row_frame,
                 text=vis_text,
@@ -947,7 +1111,7 @@ class WaveformApp(ctk.CTk):
                     row_frame,
                     text="X",
                     width=30,
-                    fg_color="#8B0000" if is_enabled else "#646464",
+                    fg_color=COLOR_REMOVE_BTN if is_enabled else COLOR_WF_OFF,
                     state="normal" if is_enabled else "disabled",
                     command=lambda wid=wf.id: self._on_remove_wf(wid)
                 )

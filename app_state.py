@@ -6,8 +6,19 @@ This module manages global and per-waveform state without UI or calculation logi
 
 from typing import List, Optional, Tuple
 
-# Default values
-DEFAULT_DURATION = 10.0  # seconds
+from config import load_config
+
+# Load defaults from config file (falls back to built-in values if missing)
+_cfg = load_config()
+DEFAULT_DURATION: float = float(_cfg["duration"])
+DEFAULT_FREQ: float = float(_cfg["frequency"])
+DEFAULT_AMP: float = float(_cfg["amplitude"])
+DEFAULT_OFFSET: float = float(_cfg["offset"])
+DEFAULT_DUTY_CYCLE: float = float(_cfg["duty_cycle"])
+DEFAULT_WF_TYPE: str = str(_cfg["waveform_type"])
+DEFAULT_Y_AXIS_TITLE: str = str(_cfg["y_axis_title"])
+DEFAULT_Y_MIN: float = float(_cfg["y_min"])
+DEFAULT_Y_MAX: float = float(_cfg["y_max"])
 
 # Parameter bounds
 DURATION_MIN = 0.5
@@ -100,13 +111,14 @@ class AppState:
         self.show_min_env: bool = False
         self.hide_src_wfs: bool = False
 
-        # Initialize with one default sine waveform
+        # Initialize with one default waveform
         self.wfs: List[WfState] = [
             WfState(
                 wf_id=0,
-                wf_type="sine",
-                freq=0.2,
-                amp=2.0,
+                wf_type=DEFAULT_WF_TYPE,
+                freq=DEFAULT_FREQ,
+                amp=DEFAULT_AMP,
+                offset=DEFAULT_OFFSET,
                 color=self.COLORS[0],
                 enabled=True
             )
@@ -127,9 +139,10 @@ class AppState:
 
         new_wf = WfState(
             wf_id=wf_id,
-            wf_type="sine",
-            freq=0.2,
-            amp=2.0,
+            wf_type=DEFAULT_WF_TYPE,
+            freq=DEFAULT_FREQ,
+            amp=DEFAULT_AMP,
+            offset=DEFAULT_OFFSET,
             color=color,
             enabled=True
         )

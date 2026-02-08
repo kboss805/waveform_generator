@@ -71,6 +71,19 @@ Each waveform has the following adjustable parameters:
 - **Offset** - Y-axis offset (0-10)
 - **Duty Cycle** - For Square waves only (1-100%)
 
+### Configuration
+
+Default settings are stored in `default.cfg` (INI format) alongside the application. You can edit this file directly or use the built-in Configure dialog:
+
+1. Open **File → Configure...**
+2. Adjust settings in three sections:
+   - **Global** — Wave duration default
+   - **Waveform Defaults** — Type, frequency, amplitude, offset, duty cycle (applied on next launch)
+   - **Display** — Y-axis title, Y-axis min/max (applied immediately)
+3. Click **Save** to persist changes to `default.cfg`
+
+> **Note:** Display settings (Y-axis title and range) take effect immediately. Waveform defaults apply the next time the application is launched.
+
 ### Exporting Data
 
 1. Click **Export to CSV**
@@ -90,6 +103,7 @@ Each waveform has the following adjustable parameters:
 - **Auto-hide source waveforms** when envelopes are enabled
 - **CSV export** with native OS file dialog (includes custom names)
 - **Independent waveform control**
+- **Configurable defaults** via File → Configure... dialog and `default.cfg`
 - **Help menu** with About dialog (version, author info)
 - **Modern Windows 11 UI** with CustomTkinter
 - **Dark theme** matplotlib plotting
@@ -97,12 +111,14 @@ Each waveform has the following adjustable parameters:
 ## File Structure
 
 ```
-waveform_generator/
+waveform_analyzer/
 ├── main.py                  # Application entry point
 ├── app_state.py            # State management
 ├── waveform_generator.py   # Waveform generation functions
 ├── ui_components.py        # UI and callbacks
 ├── data_export.py          # CSV export functionality
+├── config.py               # Configuration loader/saver
+├── default.cfg             # User-editable default settings (INI format)
 ├── requirements.txt        # Python dependencies
 ├── CLAUDE.md              # Full specification document
 └── README.md              # This file

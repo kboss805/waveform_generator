@@ -25,6 +25,7 @@ python main.py
 | `waveform_generator.py` | Pure functions | Wave/envelope generation | No state, no UI |
 | `ui_components.py` | UI layer | CustomTkinter widgets, matplotlib plots, callbacks | No calculations |
 | `data_export.py` | Export logic | CSV generation | No UI |
+| `config.py` | Configuration | Load/save `default.cfg` (INI), fallback defaults | No UI, no state mutation |
 
 ### Data Flow (Core Pattern)
 ```
@@ -140,6 +141,16 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 - Duplicate names are rejected with a re-prompt
 - Empty name reverts to default ("Waveform N")
 
+### Configuration
+- **File:** `default.cfg` (INI format) stored alongside the application or executable
+- **Access:** File → Configure... opens a modal dialog (420×640)
+- **Sections:**
+  - **Global** — `duration` (wave duration in seconds)
+  - **Waveform Defaults** — `type`, `frequency`, `amplitude`, `offset`, `duty_cycle` (applied on next launch)
+  - **Display** — `y_axis_title`, `y_min`, `y_max` (applied immediately on save)
+- **Behavior:** Display settings update the live plot instantly; waveform defaults are read at `app_state` import time
+- **PyInstaller:** Config path resolves to the directory of the executable when frozen
+
 ### Export Capability
 - **Format:** CSV with time column + amplitude columns
 - **Metadata:** Timestamp, waveform parameters, sample rate, duration
@@ -177,8 +188,9 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 ```
 
 ### Initial State (Startup)
-- 1 Sine waveform: 0.2 Hz, 2.0 amplitude, 8.0 offset, Yellow, enabled
-- duration: 10.0s, Envelopes: OFF
+- Values loaded from `default.cfg`; built-in fallbacks used if file is missing
+- Default fallback: 1 Sine waveform, 0.2 Hz, 2.0 amplitude, 8.0 offset, Yellow, enabled
+- Default fallback: duration 10.0s, Envelopes: OFF
 
 ---
 
@@ -186,7 +198,7 @@ User Input → Callback → Update State → Regenerate Waveforms → Update UI 
 
 ### Layout (1200x900 default, 1000x800 minimum, Dark Theme #1a1a1a)
 
-**Menu Bar:** Help > About... (CTkMenuBar, fully dark-themed)
+**Menu Bar:** File > Configure..., Help > About... (CTkMenuBar, fully dark-themed)
 
 **Sidebar (330px, scrollable):**
 ```
@@ -361,7 +373,7 @@ Note: Custom waveform names (via rename) are used for column headers. Spaces rep
 - [ ] FPS >30 during parameter changes
 
 ### Manual Test Scenarios
-1. **Startup:** Should show 1 Sine wave, 0.2 Hz, 2.0 amplitude, 8.0 offset
+1. **Startup:** Should show waveform with values from `default.cfg` (or fallback defaults)
 2. **Add to max:** Add 4 more waveforms, verify limit enforcement
 3. **Remove to min:** Remove to 1 waveform, verify limit enforcement
 4. **Envelope edge:** Enable max/min with only 1 wave (should be disabled)
@@ -369,6 +381,8 @@ Note: Custom waveform names (via rename) are used for column headers. Spaces rep
 6. **Rename:** Right-click waveform, enter custom name, verify in list/legend/CSV
 7. **Duplicate name:** Try renaming to an existing name, verify rejection
 8. **Auto-hide:** Enable envelope, verify source waveforms hidden automatically
+9. **Configure dialog:** Open File → Configure..., change display settings, verify plot updates immediately
+10. **Config persistence:** Modify waveform defaults in Configure, restart app, verify new defaults load
 
 ---
 
@@ -377,27 +391,22 @@ Note: Custom waveform names (via rename) are used for column headers. Spaces rep
 ### v1.1 - Enhanced Analysis
 - [ ] **Peak-to-Peak Envelope:** Shaded area between max/min
 - [ ] **RMS Envelope:** Root-mean-square calculation
-- [ ] **Moving Average Envelope:** Smoothing filter
 - [ ] **Measurement Cursors:** Click to see exact X/Y values
 
 ### v1.2 - Composite Operations
 - [ ] **Arithmetic Operations:** Add, subtract, multiply, divide waveforms
-- [ ] **FFT Display:** Frequency domain analysis
-- [ ] **Phase Relationships:** Show phase difference between waveforms
 
 ### v1.3 - Export & Usability
 - [ ] **Export Formats:** MATLAB .mat, JSON
-- [ ] **Auto-save:** Periodic state saving
 - [ ] **Keyboard Shortcuts:** Space, A, 1-5 for quick actions
 - [ ] **Color Customization:** User-selectable waveform colors
 - [ ] **Theme Toggle:** Dark/light mode
 
 ### v2.0 - Advanced Features
 - [ ] **Statistics Panel:** Mean, RMS, peak-to-peak per waveform
-- [ ] **Trigger Mode:** Oscilloscope-style triggering
 - [ ] **Multiple Plots:** Separate plots option
 - [ ] **Detachable Windows:** Resizable, multi-monitor support
-- [ ] **Custom User Settings:** Allow user to define default waveform parameters, display values, etc. from a configuration file 
+- ✅ **Custom User Settings:** Configurable defaults via `default.cfg` and File → Configure... dialog
 
 ---
 
@@ -435,7 +444,7 @@ Note: Custom waveform names (via rename) are used for column headers. Spaces rep
 - ❌ Put business logic in UI layer
 - ❌ Use global variables excessively
 - ❌ Skip type hints or docstrings
-- ❌ Create config files without requirement
+- ❌ Add new config keys without updating the Configure dialog and `save_config()`
 
 ### Do:
 - ✅ Keep modules focused on single responsibility

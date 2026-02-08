@@ -4,8 +4,9 @@ CSV export functionality for waveform data.
 This module handles exporting waveform data to CSV format without UI logic.
 """
 
+import os
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import Any, List, Tuple, Optional
 from datetime import datetime
 import re
 
@@ -21,8 +22,6 @@ def sanitize_fname(filepath: str) -> str:
     Returns:
         Sanitized filepath with .csv extension
     """
-    import os
-
     # Split into directory and filename
     directory = os.path.dirname(filepath)
     filename = os.path.basename(filepath)
@@ -47,7 +46,7 @@ def sanitize_fname(filepath: str) -> str:
 
 def export_to_csv(
     filename: str,
-    wfs: List[Tuple[str, np.ndarray, np.ndarray, dict]],
+    wfs: List[Tuple[str, np.ndarray, np.ndarray, dict[str, Any]]],
     envs: Optional[List[Tuple[str, np.ndarray, np.ndarray]]] = None,
     sample_rate: int = 1000,
     dur: float = 1.0
@@ -75,12 +74,11 @@ def export_to_csv(
 
         # Add waveform metadata
         for name, _, _, params in wfs:
-            # Combine amplitude and offset for display
-            total_amp = params['amp'] + params['offset']
             metadata_parts = [
                 f"# {name}: {params['wf_type'].capitalize()}",
                 f"{params['freq']} Hz",
-                f"{total_amp} amp"
+                f"{params['amp']} amp",
+                f"{params['offset']} offset"
             ]
 
             # Add duty cycle if applicable
