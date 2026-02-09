@@ -169,7 +169,7 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 
 ## UI Specification
 
-### Layout (1200x900 default, 1000x800 minimum, Dark Theme #1a1a1a)
+### Layout (1200x900 default, 1000x800 minimum, Dark Theme #202020)
 
 **Menu Bar:** File > Configure... | Toggle Theme, Help > About... (CTkMenuBar, themed)
 
@@ -205,20 +205,20 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 ### Color Palette (Auto-assigned, User-customizable via Right-Click)
 | Waveform | Color | RGB |
 |----------|-------|-----|
-| 1 | Pink 300 | (240, 98, 146) |
-| 2 | Light Blue 300 | (79, 195, 247) |
-| 3 | Amber 500 | (255, 193, 7) |
-| 4 | Lime 500 | (205, 220, 57) |
+| 1 | Light Blue 300 | (79, 195, 247) |
+| 2 | Pink 300 | (240, 98, 146) |
+| 3 | Deep Orange 300 | (255, 138, 101) |
+| 4 | Green 400 | (102, 187, 106) |
 | 5 | Deep Purple 200 | (179, 157, 219) |
-| MaxEnvelope | Green 300 (glow) | #81C784 / #388E3C |
-| MinEnvelope | Red 300 (glow) | #E57373 / #D32F2F |
-| RMSEnvelope | Orange 300 (glow) | #FFB74D / #EF6C00 |
+| MaxEnvelope | Green (glow) | #6CCB5F / #0E7A0D |
+| MinEnvelope | Red (glow) | #FF99A4 / #C42B1C |
+| RMSEnvelope | Amber (glow) | #FFB900 / #D88300 |
 | Peak-to-Peak | Teal (fill) | #80CBC4 / #009688 @ 12% alpha |
 | Live Cursor | White (default) | #FFFFFF @ 50% alpha, matches nearest line on proximity |
-| Pinned Cursor | Gray (dashed) | #AAAAAA @ 70% alpha |
+| Pinned Cursor | Gray (dashed) | #BDBDBD @ 70% alpha |
 
 ### Plot Styling
-- Background: #1a1a1a, Axes: #666666, Grid: #666666 @ 30% opacity
+- Background: #1C1C1C (dark) / #FFFFFF (light), Grid: themed @ 30% opacity
 - Line width: 2px, Anti-aliasing: enabled
 
 ---
@@ -271,7 +271,7 @@ def compute_rms_env(wfs):
 
 ### UI Architecture Patterns
 
-**matplotlib Integration:** Dark-themed `Figure` embedded via `FigureCanvasTkAgg` in a CustomTkinter frame. Plot update cycle: `ax.clear()` → plot all waveforms → draw envelopes → `canvas.draw()`.
+**matplotlib Integration:** Themed `Figure` embedded via `FigureCanvasTkAgg` in a CustomTkinter frame. Plot update cycle: `ax.clear()` → plot all waveforms → draw envelopes → `canvas.draw()`.
 
 **Glow Effect:** Layered lines with decreasing linewidth (8/6/4px at 0.1/0.2/0.3 alpha) plus 2px core at full alpha.
 
@@ -279,7 +279,9 @@ def compute_rms_env(wfs):
 
 **File Dialogs:** `tkinter.filedialog.asksaveasfilename()` for native OS export dialogs.
 
-**Menu Bar:** `CTkMenuBar` for dark-themed File/Help menus (not standard tkinter Menu).
+**Menu Bar:** `CTkMenuBar` for themed File/Help menus (not standard tkinter Menu).
+
+**Theme System:** WinUI-aligned color tokens defined in `winui_theme.json` (CustomTkinter default theme) and `DARK_THEME`/`LIGHT_THEME` dicts in `ui_components.py`. Font: Segoe UI Variable. Corner radii: 4px controls, 8px containers.
 
 See `ui_components.py` for full implementation details.
 

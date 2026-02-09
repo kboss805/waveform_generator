@@ -35,51 +35,47 @@ from data_export import (
 
 
 # Configure CustomTkinter appearance (theme mode set in __init__)
-ctk.set_default_color_theme("blue")
+_THEME_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "winui_theme.json")
+ctk.set_default_color_theme(_THEME_PATH)
 
 # Application version
 APP_VERSION = "1.2.0"
 
 # Theme definitions
-# Material Design color references:
-#   Grey:     50 #FAFAFA, 100 #F5F5F5, 200 #EEEEEE, 300 #E0E0E0,
-#             400 #BDBDBD, 500 #9E9E9E, 600 #757575, 700 #616161,
-#             800 #424242, 900 #212121
-#   Blue:     200 #90CAF9, 500 #2196F3, 700 #1976D2
-#   Blue Grey: 800 #37474F
-#   Green:    300 #81C784, 500 #4CAF50, 700 #388E3C
-#   Red:      300 #E57373, 700 #D32F2F, 900 #B71C1C
-#   Orange:   300 #FFB74D, 800 #EF6C00
-#   Teal:     200 #80CBC4, 500 #009688
+# WinUI / Windows 11 Fluent Design color tokens:
+#   Semi-transparent ARGB values are composited to solid hex for CustomTkinter.
+#   Dark base: #202020, Light base: #F3F3F3
+#   Ref: https://learn.microsoft.com/en-us/windows/apps/design/style/color
+#   Ref: WinUI XAML theme resources (Common_themeresources_any.xaml)
 
 DARK_THEME = {
-    # Surface elevation (Material 3 dark)
-    "surface": "#121212",              # lowest level
-    "surface_container": "#1E1E1E",    # cards
-    "surface_container_hi": "#2C2C2C", # elevated elements
+    # Surface elevation (WinUI dark)
+    "surface": "#202020",              # SolidBackgroundFillColorBase
+    "surface_container": "#2D2D2D",    # CardBackgroundFillColorDefault
+    "surface_container_hi": "#333333", # ControlFillColorSecondary
     # Semantic colors
-    "section_header": "#90CAF9",       # Blue 200
-    "text": "#FFFFFF",
-    "text_disabled": "#9E9E9E",        # Grey 500
-    "bg": "#1E1E1E",                   # sidebar / card bg
-    "plot_bg": "#121212",              # Material dark background
-    "selected_bg": "#37474F",          # Blue Grey 800
-    "selected_border": "#90CAF9",      # Blue 200
-    "separator": "#616161",            # Grey 700
-    "border": "#424242",               # Grey 800
-    "wf_on": "#4CAF50",               # Green 500
-    "wf_off": "#757575",              # Grey 600
-    "remove_btn": "#B71C1C",          # Red 900
-    "success": "#81C784",             # Green 300
-    "error": "#E57373",               # Red 300
-    "rms": "#FFB74D",                # Orange 300
-    "p2p_fill": "#80CBC4",           # Teal 200
+    "section_header": "#99EBFF",       # Accent light3 (WinUI default blue)
+    "text": "#FFFFFF",                 # TextFillColorPrimary
+    "text_disabled": "#9A9A9A",        # TextFillColorDisabled
+    "bg": "#1C1C1C",                   # SolidBackgroundFillColorSecondary
+    "plot_bg": "#1C1C1C",              # Match secondary background
+    "selected_bg": "#2A4A5C",          # Accent-tinted selection
+    "selected_border": "#60CDFF",      # WinUI accent light
+    "separator": "#3D3D3D",            # DividerStrokeColorDefault
+    "border": "#373737",               # ControlStrokeColorDefault
+    "wf_on": "#6CCB5F",               # Green accent (success)
+    "wf_off": "#6E6E6E",              # Subtle fill disabled
+    "remove_btn": "#FF99A4",          # WinUI error/delete
+    "success": "#6CCB5F",             # Green (max envelope)
+    "error": "#FF99A4",               # Red (min envelope)
+    "rms": "#FFB900",                 # WinUI warning/amber
+    "p2p_fill": "#80CBC4",            # Teal (peak-to-peak fill)
     "cursor_default": "#FFFFFF",
-    "cursor_pinned": "#BDBDBD",       # Grey 400
+    "cursor_pinned": "#BDBDBD",
     # Button hierarchy
-    "btn_primary": "#90CAF9",         # Blue 200
-    "btn_primary_text": "#000000",
-    "btn_tonal": "#2C2C2C",           # surface_container_hi
+    "btn_primary": "#60CDFF",         # WinUI accent (default blue)
+    "btn_primary_text": "#003E5C",    # Dark text on accent
+    "btn_tonal": "#333333",           # ControlFillColorSecondary
     "btn_tonal_text": "#FFFFFF",
     # System
     "plt_style": "dark_background",
@@ -87,34 +83,34 @@ DARK_THEME = {
 }
 
 LIGHT_THEME = {
-    # Surface elevation (Material 3 light)
-    "surface": "#FFFBFE",              # lowest level
-    "surface_container": "#F3EDF7",    # cards
-    "surface_container_hi": "#ECE6F0", # elevated elements
+    # Surface elevation (WinUI light)
+    "surface": "#F3F3F3",              # SolidBackgroundFillColorBase
+    "surface_container": "#FBFBFB",    # CardBackgroundFillColorDefault
+    "surface_container_hi": "#F6F6F6", # ControlFillColorSecondary
     # Semantic colors
-    "section_header": "#1976D2",       # Blue 700
-    "text": "#212121",                 # Grey 900
-    "text_disabled": "#9E9E9E",        # Grey 500
-    "bg": "#F3EDF7",                   # sidebar / card bg
+    "section_header": "#005FB8",       # WinUI accent dark
+    "text": "#1A1A1A",                 # TextFillColorPrimary
+    "text_disabled": "#A0A0A0",        # TextFillColorDisabled
+    "bg": "#EEEEEE",                   # SolidBackgroundFillColorSecondary
     "plot_bg": "#FFFFFF",
-    "selected_bg": "#E3F2FD",          # Blue 50
-    "selected_border": "#2196F3",      # Blue 500
-    "separator": "#E0E0E0",            # Grey 300
-    "border": "#BDBDBD",              # Grey 400
-    "wf_on": "#388E3C",              # Green 700
-    "wf_off": "#BDBDBD",            # Grey 400
-    "remove_btn": "#D32F2F",         # Red 700
-    "success": "#388E3C",            # Green 700
-    "error": "#D32F2F",              # Red 700
-    "rms": "#EF6C00",               # Orange 800
-    "p2p_fill": "#009688",          # Teal 500
-    "cursor_default": "#424242",     # Grey 800
-    "cursor_pinned": "#9E9E9E",      # Grey 500
+    "selected_bg": "#D5E8F7",          # Accent-tinted selection
+    "selected_border": "#005FB8",      # WinUI accent
+    "separator": "#E5E5E5",            # DividerStrokeColorDefault
+    "border": "#E0E0E0",              # ControlStrokeColorDefault
+    "wf_on": "#0E7A0D",              # Green accent (success)
+    "wf_off": "#BDBDBD",
+    "remove_btn": "#C42B1C",          # WinUI error/delete
+    "success": "#0E7A0D",            # Green (max envelope)
+    "error": "#C42B1C",              # Red (min envelope)
+    "rms": "#D88300",                # WinUI warning/amber
+    "p2p_fill": "#009688",           # Teal (peak-to-peak fill)
+    "cursor_default": "#424242",
+    "cursor_pinned": "#9E9E9E",
     # Button hierarchy
-    "btn_primary": "#1976D2",        # Blue 700
+    "btn_primary": "#005FB8",        # WinUI accent
     "btn_primary_text": "#FFFFFF",
-    "btn_tonal": "#ECE6F0",          # surface_container_hi
-    "btn_tonal_text": "#212121",
+    "btn_tonal": "#F6F6F6",          # ControlFillColorSecondary
+    "btn_tonal_text": "#1A1A1A",
     # System
     "plt_style": "default",
     "ctk_mode": "light",
@@ -122,16 +118,16 @@ LIGHT_THEME = {
 
 _theme = DARK_THEME
 
-# Material 3 font family (falls back to system default if not installed)
-_FONT_FAMILY = "Roboto"
+# Windows 11 system font (falls back to Segoe UI or system default)
+_FONT_FAMILY = "Segoe UI Variable"
 
-# Material 3 shape system (corner radii)
-RADIUS_SMALL = 4     # buttons, entries, checkboxes
-RADIUS_MEDIUM = 4    # cards, containers, dropdowns
-RADIUS_LARGE = 4     # sidebar, prominent containers
-RADIUS_FULL = 4      # primary action buttons (Add, Export)
+# WinUI shape system (corner radii)
+RADIUS_SMALL = 4     # ControlCornerRadius: buttons, entries, checkboxes
+RADIUS_MEDIUM = 8    # OverlayCornerRadius: cards, containers, dropdowns
+RADIUS_LARGE = 8     # OverlayCornerRadius: sidebar, prominent containers
+RADIUS_FULL = 4      # ControlCornerRadius: primary action buttons
 
-# Material 3 spacing grid (dp units)
+# WinUI spacing grid (epx units)
 SP_XS = 4    # tight spacing
 SP_SM = 8    # standard gap
 SP_MD = 12   # section internal padding
@@ -178,16 +174,16 @@ class WaveformApp(ctk.CTk):
         self._plot_y_max: float = _cfg["y_max"]
         self._plot_y_title: str = _cfg["y_axis_title"]
 
-        # Material 3 type scale (requires Tk root — cannot be module-level)
+        # Windows 11 type scale (requires Tk root — cannot be module-level)
         self._font_headline = ctk.CTkFont(
-            family=_FONT_FAMILY, size=18, weight="bold"
-        )
+            family=_FONT_FAMILY, size=20, weight="bold"
+        )  # Subtitle (20/28)
         self._font_title = ctk.CTkFont(
             family=_FONT_FAMILY, size=14, weight="bold"
-        )
-        self._font_body = ctk.CTkFont(family=_FONT_FAMILY, size=13)
+        )  # Body Strong (14/20)
+        self._font_body = ctk.CTkFont(family=_FONT_FAMILY, size=14)
         self._font_label = ctk.CTkFont(family=_FONT_FAMILY, size=12)
-        self._font_caption = ctk.CTkFont(family=_FONT_FAMILY, size=11)
+        self._font_caption = ctk.CTkFont(family=_FONT_FAMILY, size=12)
 
         # Store widget references
         self.wf_buttons: list = []
@@ -397,8 +393,8 @@ class WaveformApp(ctk.CTk):
         add_section("Global")
         dur_entry = add_row("Duration (s):", current["duration"])
 
-        # Waveform Defaults
-        add_section("Waveform Defaults")
+        # Waveform
+        add_section("Waveform")
         type_var = ctk.StringVar(value=current["waveform_type"])
         type_row = ctk.CTkFrame(content, fg_color="transparent")
         type_row.pack(fill="x", pady=SP_XS)
@@ -551,7 +547,7 @@ class WaveformApp(ctk.CTk):
         ).pack(pady=(20, 0))
 
     def _create_sidebar(self):
-        """Create the sidebar with all controls using Material card layout."""
+        """Create the sidebar with all controls using WinUI card layout."""
         # Sidebar frame with scrolling
         self.sidebar = ctk.CTkScrollableFrame(
             self.content_frame, width=330,
@@ -597,7 +593,7 @@ class WaveformApp(ctk.CTk):
             command=self._on_wf_type_changed,
             width=200,
             corner_radius=RADIUS_SMALL,
-            font=self._font_body
+            font=self._font_body,
         )
         self.wf_type_combo.pack(
             anchor="w", padx=SP_MD, pady=(0, SP_SM)
@@ -792,7 +788,7 @@ class WaveformApp(ctk.CTk):
         )
 
     def _create_section_card(self, title: str) -> ctk.CTkFrame:
-        """Create a Material 3 card with a title header.
+        """Create a WinUI-style card with a title header.
 
         Args:
             title: Section title text.
@@ -1433,7 +1429,7 @@ class WaveformApp(ctk.CTk):
             row_frame = ctk.CTkFrame(self.wf_list_frame, fg_color="transparent")
             row_frame.pack(fill="x", pady=SP_XS)
 
-            # Selection button (Material Outlined style)
+            # Selection button (WinUI outlined style)
             is_selected = wf.id == app_state.active_wf_index
             fg_color = _theme["selected_bg"] if is_selected else "transparent"
             border_color = (
@@ -1446,8 +1442,10 @@ class WaveformApp(ctk.CTk):
                 text=wf.display_name,
                 width=180,
                 fg_color=fg_color,
+                hover_color=_theme["selected_bg"],
                 border_color=border_color,
                 border_width=border_width,
+                text_color=_theme["text"],
                 corner_radius=RADIUS_SMALL,
                 font=self._font_body,
                 command=lambda wid=wf.id: self._on_select_wf(wid)
@@ -1473,6 +1471,8 @@ class WaveformApp(ctk.CTk):
                 text=vis_text,
                 width=40,
                 fg_color=vis_color,
+                hover_color=_theme["wf_on"],
+                text_color="#FFFFFF",
                 corner_radius=RADIUS_SMALL,
                 font=self._font_caption,
                 command=lambda wid=wf.id: self._on_toggle_wf(wid)
@@ -1488,7 +1488,9 @@ class WaveformApp(ctk.CTk):
                     text="X",
                     width=30,
                     fg_color=_theme["remove_btn"] if is_enabled else _theme["wf_off"],
+                    hover_color=_theme["remove_btn"],
                     state="normal" if is_enabled else "disabled",
+                    text_color="#FFFFFF",
                     corner_radius=RADIUS_SMALL,
                     font=self._font_caption,
                     command=lambda wid=wf.id: self._on_remove_wf(wid)

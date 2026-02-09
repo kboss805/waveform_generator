@@ -136,6 +136,7 @@ waveform_analyzer/
 ├── ui_components.py              # UI and callbacks
 ├── data_export.py                # CSV export functionality
 ├── config.py                     # Configuration loader/saver
+├── winui_theme.json              # WinUI/Windows 11 color theme for CustomTkinter
 ├── test_waveform_analyzer.py     # Automated pre-commit tests (106 tests)
 ├── default.cfg                   # User-editable default settings (INI format)
 ├── icon.ico                      # Application icon

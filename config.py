@@ -53,13 +53,13 @@ def load_config() -> dict[str, Any]:
     parser.read(config_path, encoding="utf-8")
 
     _read_float(parser, "global", "duration", defaults)
-    _read_float(parser, "waveform_defaults", "frequency", defaults)
-    _read_float(parser, "waveform_defaults", "amplitude", defaults)
-    _read_float(parser, "waveform_defaults", "offset", defaults)
-    _read_float(parser, "waveform_defaults", "duty_cycle", defaults)
+    _read_float(parser, "waveform", "frequency", defaults)
+    _read_float(parser, "waveform", "amplitude", defaults)
+    _read_float(parser, "waveform", "offset", defaults)
+    _read_float(parser, "waveform", "duty_cycle", defaults)
 
-    if parser.has_option("waveform_defaults", "type"):
-        wt = parser.get("waveform_defaults", "type").strip().lower()
+    if parser.has_option("waveform", "type"):
+        wt = parser.get("waveform", "type").strip().lower()
         if wt in ("sine", "square", "sawtooth", "triangle"):
             defaults["waveform_type"] = wt
 
@@ -97,7 +97,7 @@ def save_config(settings: dict[str, Any]) -> bool:
             "# Wave duration in seconds (0.5 - 120.0)",
             f"duration = {settings.get('duration', 10.0)}",
             "",
-            "[waveform_defaults]",
+            "[waveform]",
             "# Default waveform type: sine, square, sawtooth, triangle",
             f"type = {settings.get('waveform_type', 'sine')}",
             "# Frequency in Hz (0.1 - 100.0)",
