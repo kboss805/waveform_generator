@@ -39,7 +39,7 @@ _THEME_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "winui_th
 ctk.set_default_color_theme(_THEME_PATH)
 
 # Application version
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
 
 # Theme definitions
 # WinUI / Windows 11 Fluent Design color tokens:
@@ -457,7 +457,7 @@ class WaveformApp(ctk.CTk):
                 self._plot_y_title = new_settings["y_axis_title"]
                 self._update_all_plots()
                 status_lbl.configure(
-                    text="Saved. Waveform defaults apply on next launch.",
+                    text="Saved. Waveform settings apply on next launch.",
                     text_color=_theme["success"]
                 )
             else:

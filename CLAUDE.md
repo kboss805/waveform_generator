@@ -1,6 +1,6 @@
 # Waveform Analyzer
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 **Target Users:** Engineers visualizing up to 5 independent waveforms with envelope analysis  
 **Tech Stack:** Python 3.11+, NumPy 1.24+, SciPy 1.11+, CustomTkinter 5.2+, CTkMenuBar 0.9+, matplotlib 3.8+
 
@@ -109,9 +109,9 @@ All v1.0 user stories completed. See git history for original acceptance criteri
 - **Access:** File → Configure... opens a modal dialog (420×640)
 - **Sections:**
   - **Global** — `duration` (wave duration in seconds)
-  - **Waveform Defaults** — `type`, `frequency`, `amplitude`, `offset`, `duty_cycle` (applied on next launch)
+  - **Waveform** — `type`, `frequency`, `amplitude`, `offset`, `duty_cycle` (applied on next launch)
   - **Display** — `y_axis_title`, `y_min`, `y_max`, `theme` (applied immediately on save)
-- **Behavior:** Display settings update the live plot instantly; waveform defaults are read at `app_state` import time
+- **Behavior:** Display settings update the live plot instantly; waveform settings are read at `app_state` import time
 - **PyInstaller:** Config path resolves to the directory of the executable when frozen
 
 ### Theme Toggle
@@ -358,7 +358,7 @@ After running automated tests, verify these UI-dependent items manually:
 7. **Duplicate name:** Try renaming to an existing name, verify rejection
 8. **Auto-hide:** Enable envelope, verify source waveforms hidden automatically
 9. **Configure dialog:** Open File → Configure..., change display settings, verify plot updates immediately
-10. **Config persistence:** Modify waveform defaults in Configure, restart app, verify new defaults load
+10. **Config persistence:** Modify waveform settings in Configure, restart app, verify new values load
 11. **Theme toggle:** File → Toggle Theme switches dark/light, verify plot/menu/sidebar update, restart to verify persistence
 
 ---

@@ -88,11 +88,11 @@ Default settings are stored in `default.cfg` (INI format) alongside the applicat
 1. Open **File → Configure...**
 2. Adjust settings in three sections:
    - **Global** — Wave duration default
-   - **Waveform Defaults** — Type, frequency, amplitude, offset, duty cycle (applied on next launch)
+   - **Waveform** — Type, frequency, amplitude, offset, duty cycle (applied on next launch)
    - **Display** — Y-axis title, Y-axis min/max (applied immediately)
 3. Click **Save** to persist changes to `default.cfg`
 
-> **Note:** Display settings (Y-axis title and range) take effect immediately. Waveform defaults apply the next time the application is launched.
+> **Note:** Display settings (Y-axis title and range) take effect immediately. Waveform settings apply the next time the application is launched.
 
 ### Theme Toggle
 
@@ -222,6 +222,6 @@ The generated HTML will be in `build/sphinx/html/`. Open `build/sphinx/html/inde
 
 ## Version
 
-Current version: **1.2.0**
+Current version: **1.3.0**
 
 See [CLAUDE.md](CLAUDE.md) for the complete specification and future roadmap.
