@@ -1,7 +1,5 @@
 """
 Automated Pre-Commit Checklist Tests for Waveform Analyzer.
-
-Maps directly to the Pre-Commit Checklist in CLAUDE.md:
   - All 4 wave types render correctly
   - Edge cases: min/max frequency, amplitude
   - Duty cycle: 1%, 50%, 100% for Square

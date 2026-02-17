@@ -141,7 +141,6 @@ waveform_analyzer/
 ├── default.cfg                   # User-editable default settings (INI format)
 ├── icon.ico                      # Application icon
 ├── requirements.txt              # Python dependencies
-├── CLAUDE.md                     # Full specification document
 ├── README.md                     # This file
 └── docs/                         # Sphinx documentation source
     ├── conf.py                   # Sphinx configuration
@@ -223,5 +222,3 @@ The generated HTML will be in `build/sphinx/html/`. Open `build/sphinx/html/inde
 ## Version
 
 Current version: **1.3.0**
-
-See [CLAUDE.md](CLAUDE.md) for the complete specification and future roadmap.
