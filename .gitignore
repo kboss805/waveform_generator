@@ -32,5 +32,11 @@ Thumbs.db
 # Large binaries
 icon.png
 
-# AI assistant local state (instructions tracked in .claude/)
+# AI assistant local state
+.claude/
+.agent/
 CLAUDE.md
+
+# AI Skills Repositories
+awesome-claude-skills/
+superpowers/
