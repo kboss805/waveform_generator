@@ -98,6 +98,16 @@ Default settings are stored in `default.cfg` (INI format) alongside the applicat
 
 Switch between dark and light mode via **File → Toggle Theme**. The theme choice persists across sessions in `default.cfg`.
 
+### Detachable Plot Window
+
+Move the plot to a separate window for multi-monitor setups or flexible workspace layouts:
+
+1. **Detach:** Click **File → Detach Plot** to move the plot to a separate 800×600 resizable window
+2. **Use:** The detached window includes pan/zoom navigation and responds immediately to parameter changes in the main window
+3. **Re-attach:** Close the detached window, click the "Re-attach Plot" button in the main window placeholder, or use **File → Attach Plot**
+
+All interactive features (cursors, envelopes, pan/zoom) work identically in both attached and detached modes.
+
 ### Exporting Data
 
 1. Click **Export to CSV** (button exports to any supported format)
@@ -119,6 +129,7 @@ Switch between dark and light mode via **File → Toggle Theme**. The theme choi
 - **Envelope analysis** with glowing Max/Min/RMS envelope lines and Peak-to-Peak fill
 - **Live measurement cursors** with real-time tracking, proximity highlight, and pinned reference
 - **Auto-hide source waveforms** when envelopes are enabled
+- **Detachable plot window** for multi-monitor setups (File → Detach Plot)
 - **Multi-format export** (CSV, MATLAB .mat, JSON) with native OS file dialog
 - **Independent waveform control**
 - **Configurable defaults** via File → Configure... dialog and `default.cfg`
@@ -221,4 +232,8 @@ The generated HTML will be in `build/sphinx/html/`. Open `build/sphinx/html/inde
 
 ## Version
 
-Current version: **1.3.0**
+Current version: **2.0.0**
+
+### What's New in v2.0.0
+- ✨ **Detachable Plot Window** - Move the plot to a separate window for multi-monitor workflows
+- 🎯 All existing features from v1.x (envelopes, cursors, themes, export formats, custom colors)

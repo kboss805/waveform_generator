@@ -39,7 +39,7 @@ _THEME_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "winui_th
 ctk.set_default_color_theme(_THEME_PATH)
 
 # Application version
-APP_VERSION = "1.3.0"
+APP_VERSION = "2.0.0"
 
 # Theme definitions
 # WinUI / Windows 11 Fluent Design color tokens:
@@ -147,6 +147,54 @@ WINDOW_MIN_WIDTH = 1000
 WINDOW_MIN_HEIGHT = 900
 CONFIG_DIALOG_SIZE = "420x640"
 ABOUT_DIALOG_SIZE = "400x310"
+PLOT_WINDOW_DEFAULT_SIZE = "800x600"
+
+
+class PlotWindow(ctk.CTkToplevel):
+    """Separate window for detached plot display."""
+
+    def __init__(self, master: ctk.CTk, figure: Figure, on_close: Any):
+        """
+        Initialize detached plot window.
+
+        Args:
+            master: Parent CTk window.
+            figure: The matplotlib Figure to display.
+            on_close: Callback function when window is closed.
+        """
+        super().__init__(master)
+        self.title("Waveform Analyzer - Detached Plot")
+        self.geometry(PLOT_WINDOW_DEFAULT_SIZE)
+
+        # Set window icon if available
+        icon_path = WaveformApp._get_icon_path()
+        if os.path.exists(icon_path):
+            self.after(200, lambda: self.iconbitmap(icon_path))
+
+        self.on_close_callback = on_close
+        self.figure = figure
+
+        # Configure grid weights for proper resizing
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Create matplotlib canvas
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self)
+        self.canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Add navigation toolbar for pan/zoom
+        toolbar_frame = ctk.CTkFrame(self, fg_color="transparent")
+        toolbar_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
+        self.toolbar.update()
+
+        # Handle window close event
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self):
+        """Handle window close event by calling callback and destroying."""
+        self.on_close_callback()
+        self.destroy()
 
 
 class WaveformApp(ctk.CTk):
@@ -194,6 +242,10 @@ class WaveformApp(ctk.CTk):
 
         # Cached waveform data for cursor proximity checks
         self._cached_wf_data: list[Tuple[np.ndarray, np.ndarray]] = []
+
+        # Detached plot window state
+        self.plot_window: Optional[PlotWindow] = None
+        self.is_detached: bool = False
 
         # Create UI components
         self._create_menu_bar()
@@ -270,6 +322,10 @@ class WaveformApp(ctk.CTk):
             option="Toggle Theme",
             command=self._toggle_theme
         )
+        file_dropdown.add_option(
+            option="Detach Plot" if not self.is_detached else "Attach Plot",
+            command=self._toggle_plot_detachment
+        )
 
         # Help menu
         help_btn = self.menu_bar.add_cascade(
@@ -330,6 +386,21 @@ class WaveformApp(ctk.CTk):
         self._update_env_controls()
         self._update_add_button()
         self._update_all_plots()
+
+    def _toggle_plot_detachment(self):
+        """Toggle between attached and detached plot modes."""
+        if self.is_detached:
+            self._attach_plot()
+        else:
+            self._detach_plot()
+
+        # Rebuild menu bar to update menu option text
+        self.menu_bar.destroy()
+        self._create_menu_bar()
+
+        # Re-pack content frame so menu bar stays on top
+        self.content_frame.pack_forget()
+        self.content_frame.pack(fill="both", expand=True)
 
     def _on_configure(self):
         """Open the Configure dialog."""
@@ -747,6 +818,28 @@ class WaveformApp(ctk.CTk):
             anchor="w", padx=SP_MD, pady=(0, SP_MD)
         )
 
+    def _create_embedded_plot_widgets(self, parent_frame: ctk.CTkFrame) -> Tuple[FigureCanvasTkAgg, NavigationToolbar2Tk]:
+        """
+        Create matplotlib canvas and toolbar widgets for embedding.
+
+        Args:
+            parent_frame: The frame to embed the widgets in.
+
+        Returns:
+            Tuple of (canvas, toolbar).
+        """
+        # Create matplotlib canvas
+        canvas = FigureCanvasTkAgg(self.fig, master=parent_frame)
+        canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+
+        # Add navigation toolbar for pan/zoom
+        toolbar_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        toolbar_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
+        toolbar = NavigationToolbar2Tk(canvas, toolbar_frame)
+        toolbar.update()
+
+        return canvas, toolbar
+
     def _create_plot_area(self):
         """Create the matplotlib plot area."""
         # Plot container
@@ -771,15 +864,8 @@ class WaveformApp(ctk.CTk):
         self.ax.set_ylabel(self._plot_y_title)
         self.ax.grid(True, alpha=0.3, color=_theme["separator"])
 
-        # Embed in tkinter
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
-        self.canvas.get_tk_widget().grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
-
-        # Add navigation toolbar for pan/zoom
-        toolbar_frame = ctk.CTkFrame(self.plot_frame, fg_color="transparent")
-        toolbar_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=(0, 5))
-        self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
-        self.toolbar.update()
+        # Embed canvas and toolbar
+        self.canvas, self.toolbar = self._create_embedded_plot_widgets(self.plot_frame)
 
     def _create_status_bar(self):
         """Create the status bar."""
@@ -791,6 +877,99 @@ class WaveformApp(ctk.CTk):
             row=1, column=0, columnspan=2, sticky="ew",
             padx=SP_MD, pady=(SP_SM, SP_MD)
         )
+
+    def _detach_plot(self):
+        """Move plot from main window to separate detached window."""
+        if self.is_detached:
+            return  # Already detached
+
+        self.is_detached = True
+
+        # Destroy embedded canvas and toolbar widgets
+        for widget in self.plot_frame.winfo_children():
+            widget.destroy()
+
+        # Create placeholder frame in main window
+        placeholder = ctk.CTkFrame(
+            self.plot_frame,
+            fg_color=_theme["surface_container"],
+            corner_radius=RADIUS_MEDIUM
+        )
+        placeholder.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        placeholder.grid_rowconfigure(0, weight=1)
+        placeholder.grid_columnconfigure(0, weight=1)
+
+        # Center content in placeholder
+        center_frame = ctk.CTkFrame(placeholder, fg_color="transparent")
+        center_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(
+            center_frame,
+            text="Plot is detached",
+            font=self._font_headline,
+            text_color=_theme["text"]
+        ).pack(pady=(0, SP_MD))
+
+        ctk.CTkLabel(
+            center_frame,
+            text="The plot is visible in a separate window",
+            font=self._font_body,
+            text_color=_theme["text_disabled"]
+        ).pack(pady=(0, SP_LG))
+
+        ctk.CTkButton(
+            center_frame,
+            text="Re-attach Plot",
+            command=self._attach_plot,
+            corner_radius=RADIUS_FULL,
+            fg_color=_theme["btn_primary"],
+            text_color=_theme["btn_primary_text"],
+            font=self._font_body
+        ).pack()
+
+        # Create detached plot window
+        self.plot_window = PlotWindow(
+            master=self,
+            figure=self.fig,
+            on_close=self._attach_plot
+        )
+
+        # Update canvas and toolbar references to detached window
+        self.canvas = self.plot_window.canvas
+        self.toolbar = self.plot_window.toolbar
+
+        # Reconnect matplotlib events
+        self.canvas.mpl_connect('motion_notify_event', self._on_mouse_move)
+        self.canvas.mpl_connect('button_press_event', self._on_plot_click)
+
+        # Redraw in detached window
+        self.canvas.draw()
+
+    def _attach_plot(self):
+        """Return plot from detached window to main window."""
+        if not self.is_detached:
+            return  # Not detached
+
+        self.is_detached = False
+
+        # Destroy detached window if it exists
+        if self.plot_window is not None:
+            self.plot_window.destroy()
+            self.plot_window = None
+
+        # Clear placeholder widgets from plot frame
+        for widget in self.plot_frame.winfo_children():
+            widget.destroy()
+
+        # Recreate embedded canvas and toolbar in main window
+        self.canvas, self.toolbar = self._create_embedded_plot_widgets(self.plot_frame)
+
+        # Reconnect matplotlib events
+        self.canvas.mpl_connect('motion_notify_event', self._on_mouse_move)
+        self.canvas.mpl_connect('button_press_event', self._on_plot_click)
+
+        # Redraw in main window
+        self.canvas.draw()
 
     def _create_section_card(self, title: str) -> ctk.CTkFrame:
         """Create a WinUI-style card with a title header.
